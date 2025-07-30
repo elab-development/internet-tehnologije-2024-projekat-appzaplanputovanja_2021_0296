@@ -16,14 +16,12 @@ return new class extends Migration
             $table->string('name');
             $table->string('address');
             $table->string('city');
-            //$table->string('state')->nullable();
             $table->string('zip_code');
             $table->string('country');
-            //$table->string('phone_number')->nullable();
-           // $table->string('email')->nullable();
-            //$table->string('website')->nullable();
+            $table->string('email')->nullable();
             $table->double('price_per_night');
             $table->timestamps();
+            $table->integer('capacity');
         });
     }
 

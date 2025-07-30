@@ -4,6 +4,8 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use App\Models\TravelPlan;
+use App\Models\Review;
 
 class Accommodation extends Model
 {
@@ -13,16 +15,22 @@ class Accommodation extends Model
         'name',
         'address',
         'city',
-        //'state',
         'zip_code',
         'country',
-        //'phone_number',
         'email',
-        //'website',
-        //'description',
         'price_per_night',
-        //'amenities',
+        'capacity',
     ];
+    public function travelPlans()
+    {
+        return $this->hasMany(TravelPlan::class);
+    }
+
+    public function reviews()
+    {
+        return $this->hasMany(Review::class);
+    }
+
 
 
 

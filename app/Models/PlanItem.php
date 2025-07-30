@@ -12,7 +12,6 @@ class PlanItem extends Model
     use HasFactory;
 
     protected $fillable = [
-        'item_id',
         'name',
         'time_from',
         'time_to',
@@ -21,10 +20,12 @@ class PlanItem extends Model
         'travel_plan_id',
     ];
     public function travelPlan() {
-    return $this->belongsTo(TravelPlan::class);
+        return $this->belongsTo(TravelPlan::class);  // 1 plan item belongs to one travel plan
+                                                     //svaka stavka plana se veže za jedan konkretan plan putovanja
     }
 
     public function activity() {
-        return $this->belongsTo(Activity::class);
+        return $this->belongsTo(Activity::class); // 1 plan item belongs to one activity
+                                                     //svaka stavka predstavlja jednu aktivnost
     }
 }
