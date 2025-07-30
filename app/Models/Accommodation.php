@@ -12,18 +12,19 @@ class Accommodation extends Model
     use HasFactory; // for the test
 
     protected $fillable = [
+        'travel_plan_id',
         'name',
-        'address',
-        'city',
-        'zip_code',
+        'location',
         'country',
         'email',
         'price_per_night',
-        'capacity',
+        'number_of_nights',
+        'passenger_count',
+        'total_price',
     ];
     public function travelPlans()
     {
-        return $this->hasMany(TravelPlan::class);
+        return $this->belongsTo(TravelPlan::class);
     }
 
     public function reviews()
