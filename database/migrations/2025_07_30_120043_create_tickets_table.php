@@ -11,17 +11,15 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('accommodations', function (Blueprint $table) {
+        Schema::create('tickets', function (Blueprint $table) {
             $table->id();
             $table->foreignId('travel_plan_id')->constrained()->onDelete('cascade');
-            $table->string('name');
-            $table->string('location');
-            $table->string('country');
-            $table->string('email')->nullable();
-            $table->double('price_per_night');
-            $table->integer('number_of_nights'); 
-            $table->unsignedInteger('passenger_count')->default(1);
-            $table->decimal('total_price', 10, 2)->nullable();
+            $table->string('transport_type');
+            $table->string('departure_city');
+            $table->string('arrival_city');
+            $table->datetime('departure_time')->nullable();
+            $table->decimal('price', 10, 2);
+            $table->unsignedInteger('passenger_count')->default(1); //uzima iz plana putovanja
             $table->timestamps();
         });
     }
@@ -31,6 +29,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('accommodations');
+        Schema::dropIfExists('tickets');
     }
 };

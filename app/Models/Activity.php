@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use App\Models\PlanItem;
 
 class Activity extends Model
 {
@@ -15,5 +16,9 @@ class Activity extends Model
         'description',
     ];
     
-    //
+    public function planItems()
+    {
+        return $this->hasMany(PlanItem::class);
+    }
+
 }
