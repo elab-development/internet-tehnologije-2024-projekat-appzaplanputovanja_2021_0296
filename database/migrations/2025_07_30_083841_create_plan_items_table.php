@@ -13,14 +13,10 @@ return new class extends Migration
     {
         Schema::create('plan_items', function (Blueprint $table) {
             $table->id();
-
-           // $table->foreign('travelplan_id')-constrained()->onDelete('cascade');
-           // $table->foreign('activity_id')->constrained()->onDelete('cascade');
             
-            $table->unsignedBigInteger('travelplan_id');
-            $table->unsignedBigInteger('activity_id');
-            $table->foreign('travelplan_id')->references('id')->on('travel_plans')->onDelete('cascade');
-            $table->foreign('activity_id')->references('id')->on('activities')->onDelete('cascade');
+            $table->foreignId('travel_plan_id')->constrained('travel_plans')->onDelete('cascade');
+            $table->foreignId('activity_id')->constrained('activities')->onDelete('cascade');
+
 
             $table->string('name');
             $table->dateTime('time_from');
