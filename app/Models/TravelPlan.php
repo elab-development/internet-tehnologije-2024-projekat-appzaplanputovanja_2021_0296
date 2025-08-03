@@ -48,7 +48,10 @@ class TravelPlan extends Model
     }
     public function accommodation()
     {
-        return $this->hasOne(Accommodation::class); // 1 travel plan can have one accommodation (e.g., hotel, Airbnb, etc.)
+        return $this->belongsToMany(Accommodation::class)
+                    ->withPivot('check_in', 'check_out')
+                    ->withTimestamps();
+
     }
 
 

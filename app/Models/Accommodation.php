@@ -24,7 +24,10 @@ class Accommodation extends Model
     ];
     public function travelPlans()
     {
-        return $this->belongsTo(TravelPlan::class);
+        return $this->belongsToMany(TravelPlan::class)
+                    ->withPivot('check_in', 'check_out')
+                    ->withTimestamps();
+
     }
 
     public function reviews()
