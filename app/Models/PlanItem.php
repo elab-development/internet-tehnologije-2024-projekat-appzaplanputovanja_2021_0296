@@ -12,12 +12,9 @@ class PlanItem extends Model
     use HasFactory;
 
     protected $fillable = [
-        'name',
         'time_from',
         'time_to',
         'amount',
-        'activity_id',
-        'travel_plan_id',
     ];
     public function travelPlan() {
         return $this->belongsTo(TravelPlan::class);  // 1 plan item belongs to one travel plan

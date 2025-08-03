@@ -12,15 +12,11 @@ class Accommodation extends Model
     use HasFactory; // for the test
 
     protected $fillable = [
-        'travel_plan_id',
         'name',
         'location',
         'country',
         'email',
         'price_per_night',
-        'number_of_nights',
-        'passenger_count',
-        'total_price',
     ];
     public function travelPlans()
     {

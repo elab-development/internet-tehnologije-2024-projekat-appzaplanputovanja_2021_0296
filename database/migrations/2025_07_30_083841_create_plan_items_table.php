@@ -17,11 +17,9 @@ return new class extends Migration
             $table->foreignId('travel_plan_id')->constrained('travel_plans')->onDelete('cascade');
             $table->foreignId('activity_id')->constrained('activities')->onDelete('cascade');
 
-
-            $table->string('name');
             $table->dateTime('time_from');
             $table->dateTime('time_to');
-            $table->double('amount')->nullable();
+            $table->decimal('amount',10,2)->default(0.00);
             $table->timestamps();
         });
     }

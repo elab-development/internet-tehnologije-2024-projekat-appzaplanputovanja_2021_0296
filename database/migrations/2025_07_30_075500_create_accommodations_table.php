@@ -17,10 +17,7 @@ return new class extends Migration
             $table->string('location');
             $table->string('country');
             $table->string('email')->nullable();
-            $table->double('price_per_night');
-            $table->integer('number_of_nights'); 
-            $table->unsignedInteger('passenger_count')->default(1);
-            $table->decimal('total_price', 10, 2)->nullable();
+            $table->decimal('price_per_night',10,2);
             $table->timestamps();
         });
     }

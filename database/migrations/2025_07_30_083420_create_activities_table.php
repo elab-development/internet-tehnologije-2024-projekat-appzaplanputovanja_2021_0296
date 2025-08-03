@@ -14,8 +14,8 @@ return new class extends Migration
         Schema::create('activities', function (Blueprint $table) {
             $table->id();
             $table->string('name');
-            $table->double('price');
-            $table->double('duration');
+            $table->decimal('price',10,2);
+            $table->integer('duration'); // Duration in minutes
             $table->text('description')->nullable();
             $table->timestamps();
         });

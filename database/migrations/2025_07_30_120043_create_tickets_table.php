@@ -19,7 +19,6 @@ return new class extends Migration
             $table->string('arrival_city');
             $table->datetime('departure_time')->nullable();
             $table->decimal('price', 10, 2);
-            $table->unsignedInteger('passenger_count')->default(1); //uzima iz plana putovanja
             $table->timestamps();
         });
     }
