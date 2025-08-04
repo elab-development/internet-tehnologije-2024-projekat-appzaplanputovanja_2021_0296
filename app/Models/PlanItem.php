@@ -14,4 +14,14 @@ class PlanItem extends Model
         'time_to',
         'amount',
     ];
+
+    public function travelPlan()
+    {
+        return $this->belongsTo(TravelPlan::class);
+    }
+
+    public function activity()
+    {
+        return $this->belongsTo(Activity::class);
+    }
 }
