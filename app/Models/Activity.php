@@ -17,4 +17,10 @@ class Activity extends Model
         'location',
         'content', // Updated from 'description' to 'content'
     ];
+
+    // Define the relationship with PlanItem model
+    public function planItems()
+    {
+        return $this->hasMany(PlanItem::class); // 1 activity can have many plan items
+    }
 }
