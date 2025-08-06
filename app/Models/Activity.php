@@ -23,4 +23,25 @@ class Activity extends Model
     {
         return $this->hasMany(PlanItem::class); // 1 activity can have many plan items
     }
+
+    public static function availablePreferenceTypes(): array
+    {
+        return [
+            'travel_with_children',
+            'enjoy_nature',
+            'love_food_and_drink',
+            'want_to_relax',
+            'want_culture',
+            'seek_fun',
+            'adventurous',
+            'avoid_crowds',
+            'comfortable_travel',
+            'cafe_sitting',
+            'shopping',
+            'want_to_learn',
+            'active_vacation',
+            'research_of_tradition',
+        ];
+    }
+
 }
