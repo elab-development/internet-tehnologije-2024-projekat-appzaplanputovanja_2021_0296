@@ -51,4 +51,7 @@ class TravelPlan extends Model
             'research_of_tradition',
         ];
     }
+    protected $casts = [
+        'preferences' => 'array', // Ensure preferences is cast to an array
+    ];
 }
