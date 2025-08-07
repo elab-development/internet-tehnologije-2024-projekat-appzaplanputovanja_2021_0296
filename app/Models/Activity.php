@@ -43,5 +43,9 @@ class Activity extends Model
             'research_of_tradition',
         ];
     }
+    protected $casts = [
+        'preference_types' => 'array', // Ensure preference_types is cast to an array
+    ];
+
 
 }

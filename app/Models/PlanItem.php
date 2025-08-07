@@ -13,6 +13,7 @@ class PlanItem extends Model
         'time_from',
         'time_to',
         'amount',
+        'name', // Added name field
     ];
 
     public function travelPlan()

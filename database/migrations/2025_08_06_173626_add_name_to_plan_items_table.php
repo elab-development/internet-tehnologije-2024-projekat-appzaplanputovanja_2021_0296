@@ -11,8 +11,8 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::table('activities', function (Blueprint $table) {
-            $table->json('preference_types')->nullable();
+        Schema::table('plan_items', function (Blueprint $table) {
+            $table->string('name')->after('id');
         });
     }
 
@@ -21,8 +21,8 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::table('activities', function (Blueprint $table) {
-            $table->dropColumn('preference_types');
+        Schema::table('plan_items', function (Blueprint $table) {
+            $table->dropColumn('name');
         });
     }
 };
