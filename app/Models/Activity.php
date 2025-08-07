@@ -16,6 +16,7 @@ class Activity extends Model
         'duration',
         'location',
         'content', // Updated from 'description' to 'content'
+        'preference_types', 
     ];
 
     // Define the relationship with PlanItem model
@@ -24,6 +25,22 @@ class Activity extends Model
         return $this->hasMany(PlanItem::class); // 1 activity can have many plan items
     }
 
+    public static function availableTypes(): array
+    {
+        return [
+            'Transport',
+            'Accommodation',
+            'Food&Drink',
+            'Culture&Sightseeing',
+            'Shopping&Souvenirs',
+            'Nature&Adventure',
+            'Relaxation&Wellness',
+            'Family-Friendly',
+            'Educational&Volunteering',
+            'Entertainment&Leisure',
+            'other',
+        ];
+    }
     public static function availablePreferenceTypes(): array
     {
         return [
