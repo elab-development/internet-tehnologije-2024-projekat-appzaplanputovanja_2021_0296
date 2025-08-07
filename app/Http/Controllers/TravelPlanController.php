@@ -5,6 +5,8 @@ namespace App\Http\Controllers;
 use App\Models\TravelPlan;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
+use illuminate\Http\JsonResponse;
+use Carbon\Carbon;
 
 class TravelPlanController extends Controller
 {
@@ -30,7 +32,7 @@ class TravelPlanController extends Controller
             'passenger_count' => 'required|integer|min:1',
             'preferences'     => 'required|array',
             'preferences.*' => [
-                Rule::in(Activity::availablePreferences()),
+                Rule::in(TravelPlan::availablePreferences()),
             ],
         ]);
 
@@ -61,7 +63,7 @@ class TravelPlanController extends Controller
             'passenger_count' => 'sometimes|required|integer|min:1',
             'preferences'     => 'sometimes|required|array',
             'preferences.*' => [
-                Rule::in(Activity::availablePreferences()),
+                Rule::in(TravelPlan::availablePreferences()),
             ],
         ]);
 
@@ -78,5 +80,18 @@ class TravelPlanController extends Controller
         $travelPlan->delete();
 
         return response()->noContent();
+    }
+
+    //GET /api/travel-plans/upcoming
+    public function upcoming(Request $request): JsonResponse
+    {
+        $plans = TravelPlan::where('start_date', '>', Carbon::now())
+                           ->orderBy('start_date', 'asc') //rastuce po datumu pocetka
+                           ->get();
+
+        return response()->json([
+            'data' => $plans,
+            'count' => $plans->count(),
+        ]);
     }
 }

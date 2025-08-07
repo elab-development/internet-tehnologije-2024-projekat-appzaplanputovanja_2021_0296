@@ -68,4 +68,11 @@ class UserController extends Controller
         $user->delete();
         return response()->noContent();
     }
+
+    //GET /api/users/{user}/travel-plans
+    public function plans(User $user): JsonResponse
+    {
+        return response()->json($user->travelPlans);
+    }
+
 }
