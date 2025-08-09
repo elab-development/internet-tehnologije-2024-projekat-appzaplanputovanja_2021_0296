@@ -33,7 +33,7 @@ class TravelPlan extends Model
     }
 
 
-    public static function availablePreferences()
+    /**public static function availablePreferences()
     {
         return [
             'travel_with_children',
@@ -54,5 +54,5 @@ class TravelPlan extends Model
     }
     protected $casts = [
         'preferences' => 'array', // Ensure preferences is cast to an array
-    ];
+    ];*/
 }

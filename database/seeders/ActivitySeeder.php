@@ -24,7 +24,7 @@ class ActivitySeeder extends Seeder
             Activity::create([
                 'name' => "Transport to {$plan->destination}",
                 'location' => $plan->destination,
-                'type' => 'transport',
+                'type' => 'Transport',
                 'price' => 30,
                 'duration' => 90,
                 'content' => "Transport from {$plan->start_location} to {$plan->destination}"
@@ -33,7 +33,7 @@ class ActivitySeeder extends Seeder
             Activity::create([
                 'name' => "Accommodation in {$plan->destination}",
                 'location' => $plan->destination,
-                'type' => 'accommodation',
+                'type' => 'Accommodation',
                 'price' => 40 * $nights,
                 'duration' => $nights * 480,
                 'content' => "Accommodation stay in {$plan->destination}"
@@ -42,7 +42,7 @@ class ActivitySeeder extends Seeder
             Activity::create([
                 'name' => "Transport back to {$plan->start_location}",
                 'location' => $plan->destination,
-                'type' => 'transport',
+                'type' => 'Transport',
                 'price' => 30,
                 'duration' => 90,
                 'content' => "Transport back to {$plan->start_location}"

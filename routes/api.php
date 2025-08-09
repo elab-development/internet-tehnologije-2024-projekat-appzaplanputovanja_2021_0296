@@ -37,8 +37,8 @@ Route::post(
 )->name('travel-plans.items.store');
 
 //ažuriranje jedne stavke plana
-Route::patch('
-    travel-plans/{travel_plan}/items/{plan_item}', 
+Route::patch(
+    'travel-plans/{travel_plan}/items/{plan_item}', 
     [PlanItemController::class, 'update']
 )->name('travel-plans.items.update');
 

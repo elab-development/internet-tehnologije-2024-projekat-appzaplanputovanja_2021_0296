@@ -21,11 +21,11 @@ class PlanItemSeeder extends Seeder
             $numNights = Carbon::parse($plan->start_date)->diffInDays(Carbon::parse($plan->end_date));
 
             // 1. Dodaj TRANSPORT aktivnosti
-            $transportTo = Activity::where('type', 'transport')
+            $transportTo = Activity::where('type', 'Transport')
                 ->where('name', 'like', "Transport to {$plan->destination}")
                 ->first();
 
-            $transportBack = Activity::where('type', 'transport')
+            $transportBack = Activity::where('type', 'Transport')
                 ->where('name', 'like', "Transport back to {$plan->start_location}")
                 ->first();
 
@@ -54,7 +54,7 @@ class PlanItemSeeder extends Seeder
             }
 
             // 2. Dodaj ACCOMMODATION aktivnost
-            $accommodation = Activity::where('type', 'accommodation')
+            $accommodation = Activity::where('type', 'Accommodation')
                 ->where('location', $plan->destination)
                 ->first();
 
@@ -72,8 +72,8 @@ class PlanItemSeeder extends Seeder
 
             // 3. Dodaj aktivnosti koje odgovaraju preferencijama
             $preferences = $plan->preferences ?? []; //cuva niz korisnikovih preferencija iz datog plana
-            $activities = Activity::where('type', '!=', 'transport')
-                ->where('type', '!=', 'accommodation')
+            $activities = Activity::where('type', '!=', 'Transport')
+                ->where('type', '!=', 'Accommodation')
                 ->where('location', $plan->destination)
                 ->get();    //uzima sve aktivnosti koje se slazu sa destinacijom a nisu obavezne
 
