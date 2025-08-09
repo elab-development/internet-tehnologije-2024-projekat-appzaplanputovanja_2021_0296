@@ -5,13 +5,15 @@ namespace App\Http\Controllers;
 use App\Models\Activity;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Response;
 
 class ActivityController extends Controller
 {
     /**
      * Display a listing of the resource.
      */
-    public function index()
+    public function index(Request $request)
     {
         $query = Activity::query();
 
@@ -98,6 +100,11 @@ class ActivityController extends Controller
     {
         $activity->delete();
 
-        return response()->noContent();
+        //return response()->noContent();
+
+        return response()->json([
+            'data'    => null,
+            'message' => 'Aktivity deleted successfully.'
+        ], 200);
     }
 }

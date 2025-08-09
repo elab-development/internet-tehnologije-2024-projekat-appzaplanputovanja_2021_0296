@@ -4,6 +4,9 @@ namespace App\Http\Controllers;
 
 use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Response;
+use Carbon\Carbon;
 
 class UserController extends Controller
 {
@@ -13,7 +16,7 @@ class UserController extends Controller
     public function index() 
     { 
         $users=User::all(); 
-        return $users; 
+        return response()->json($users);
     }
 
     /**
@@ -66,13 +69,27 @@ class UserController extends Controller
     public function destroy(User $user)
     {
         $user->delete();
-        return response()->noContent();
+        //return response()->noContent();
+        return response()->json([
+            'data'    => null,
+            'message' => 'User deleted successfully.'
+        ], 200);
     }
 
     //GET /api/users/{user}/travel-plans
-    public function plans(User $user): JsonResponse
+    public function plans(User $user, Request $request): JsonResponse
     {
-        return response()->json($user->travelPlans);
+        //filter by upcoming plans
+
+        $query = $user->travelPlans()
+                ->whereDate('start_date', '>=', Carbon::today())
+                ->orderBy('start_date', 'asc');
+
+        $perPage = $request->integer('per_page', 15);
+        return response()->json($query->paginate($perPage));
+
+        // bez paginacije: return response()->json(['data' => $query->get()]);
+        //sve planove korisnika: return response()->json($user->travelPlans);
     }
 
 }

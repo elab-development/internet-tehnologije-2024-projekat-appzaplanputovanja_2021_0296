@@ -10,6 +10,7 @@ class TravelPlan extends Model
     use HasFactory; #for the test
 
     protected $fillable = [
+        'user_id',
         'start_location',
         'destination',
         'start_date',

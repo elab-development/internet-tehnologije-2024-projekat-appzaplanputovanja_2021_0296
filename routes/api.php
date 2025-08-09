@@ -18,8 +18,11 @@ use App\Http\Controllers\UserController;
 |
 */
 
-//zahtev api/travel-plans
+// RESOURCE ruta za TravelPlans
 Route::apiResource('travel-plans', TravelPlanController::class); //kreira sve osnovne REST rute  
+
+// RESOURCE ruta za Activities
+Route::apiResource('activities', ActivityController::class);
 
 //uzima sve stavke za jedan TravelPlan
 Route::get(
@@ -33,33 +36,23 @@ Route::post(
     [PlanItemController::class, 'store']
 )->name('travel-plans.items.store');
 
-//brisanje stavke 
-Route::delete(
-    'plan-items/{plan_item}',
-    [PlanItemController::class, 'destroy']
-)->name('plan-items.destroy');
-
-//PATCH ruta za ažuriranje jedne PlanItem stavke
-Route::patch(
-    'plan-items/{plan_item}',
+//ažuriranje jedne stavke plana
+Route::patch('
+    travel-plans/{travel_plan}/items/{plan_item}', 
     [PlanItemController::class, 'update']
-)->name('plan-items.update');
+)->name('travel-plans.items.update');
 
-// RESOURCE ruta za Activities
-Route::apiResource('activities', ActivityController::class);
+//brisanje stavke plana
+Route::delete(
+    'travel-plans/{travel_plan}/items/{plan_item}', 
+    [PlanItemController::class, 'destroy']
+)->name('travel-plans.items.destroy');
 
-// GET ruta za nadolazeće planove (npr. svi planovi čiji je start_date > danas)
-Route::get(
-    'travel-plans/upcoming',
-    [TravelPlanController::class, 'upcoming']
-)->name('travel-plans.upcoming');
-
-// uzima sve planove određenog korisnika
+// uzima sve nadolazece planove određenog korisnika
 Route::get(
     'users/{user}/travel-plans',
     [UserController::class, 'plans']
 )->name('users.travel-plans');
-
 
 Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
     return $request->user();

@@ -10,6 +10,8 @@ class PlanItem extends Model
     use HasFactory;
 
     protected $fillable = [
+        'travel_plan_id',
+        'activity_id',
         'time_from',
         'time_to',
         'amount',
