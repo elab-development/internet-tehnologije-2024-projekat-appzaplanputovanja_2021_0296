@@ -5,6 +5,8 @@ namespace App\Http\Controllers;
 use App\Models\TravelPlan;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
+use Illuminate\Http\JsonResponse;
+use Carbon\Carbon;
 
 class TravelPlanController extends Controller
 {
@@ -22,6 +24,7 @@ class TravelPlanController extends Controller
     public function store(Request $request)
     {
         $data = $request->validate([
+            'user_id'          => 'required|integer|exists:users,id', //menjati kada se koristi auth()->user()->id
             'start_location'  => 'required|string',
             'destination'     => 'required|string',
             'start_date'      => 'required|date',
@@ -30,13 +33,14 @@ class TravelPlanController extends Controller
             'passenger_count' => 'required|integer|min:1',
             'preferences'     => 'required|array',
             'preferences.*' => [
-                Rule::in(Activity::availablePreferences()),
+                Rule::in(TravelPlan::availablePreferences()),
             ],
         ]);
 
+        //$data['user_id'] = $request->user()->id; ->za auth
         $plan = TravelPlan::create($data);
 
-        return response()->json($plan, 201);
+        return response()->json($plan, 201); //201 Created
     }
 
     /**
@@ -61,7 +65,7 @@ class TravelPlanController extends Controller
             'passenger_count' => 'sometimes|required|integer|min:1',
             'preferences'     => 'sometimes|required|array',
             'preferences.*' => [
-                Rule::in(Activity::availablePreferences()),
+                Rule::in(TravelPlan::availablePreferences()),
             ],
         ]);
 
@@ -77,6 +81,10 @@ class TravelPlanController extends Controller
     {
         $travelPlan->delete();
 
-        return response()->noContent();
+        //return response()->noContent();
+        return response()->json([
+            'data'    => null,
+            'message' => 'Travel plan deleted successfully.'
+        ], 200);
     }
 }

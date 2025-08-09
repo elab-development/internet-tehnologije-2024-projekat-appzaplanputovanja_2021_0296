@@ -1,11 +1,13 @@
 <?php
 
 namespace App\Http\Controllers;
-use app\Models\Activity;
-use app\Models\TravelPlan;
+use App\Models\Activity;
+use App\Models\TravelPlan;
 use App\Models\PlanItem;
 use Illuminate\Http\Request;
-use Illumiate\Http\Response;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Response;
+use Carbon\Carbon;
 
 class PlanItemController extends Controller
 {
@@ -79,6 +81,10 @@ class PlanItemController extends Controller
 
         $planItem->delete();
 
-        return response()->noContent();
+        //return response()->noContent();
+        return response()->json([
+            'data'    => null,
+            'message' => 'Plan item deleted successfully.'
+        ], 200);
     }
 }
