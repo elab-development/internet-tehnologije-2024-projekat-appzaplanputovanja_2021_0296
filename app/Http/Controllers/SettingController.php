@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Setting;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
+use App\Http\Resources\SettingResource;
 
 class SettingController extends Controller
 {
@@ -21,13 +22,15 @@ class SettingController extends Controller
     ];
 
     public function index() {
-        return response()->json(Setting::all());
+        //return response()->json(Setting::all());
+        return SettingResource::collection(Setting::all());
     }
 
     public function show(string $key) {
         $setting = Setting::find($key);
         if (!$setting) return response()->json(['message'=>'Not found'], 404);
-        return response()->json($setting);
+        //return response()->json($setting);
+        return new SettingResource($setting);
     }
 
     // upsert jednog ključa
@@ -46,9 +49,12 @@ class SettingController extends Controller
         }
 
         $data = $request->validate($rules);
-        $rec  = Setting::setValue($data['key'], (string)$data['value']);
+       $rec  = Setting::setValue($data['key'], (string)$data['value']);
+        
+       return (new SettingResource($rec))->response()->setStatusCode(201);
+       //return response()->json($rec, 201);
 
-        return response()->json($rec, 201);
+
     }
 
     // batch upsert više ključeva odjednom
@@ -73,6 +79,7 @@ class SettingController extends Controller
             $out[] = Setting::setValue($key, (string)$value);
         }
 
-        return response()->json($out, 201);
+        return SettingResource::collection(collect($out))->response()->setStatusCode(201);
+        //return response()->json($out, 201);
     }
 }

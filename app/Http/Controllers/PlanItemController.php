@@ -10,6 +10,8 @@ use Carbon\Carbon;
 use App\Models\PlanItem;
 use App\Models\Activity;
 use App\Models\TravelPlan;
+use App\Http\Resources\PlanItemResource;
+use App\Http\Resources\ActivityResource;
 
 class PlanItemController extends Controller
 {
@@ -35,9 +37,9 @@ class PlanItemController extends Controller
         }
         // Pagination with a maximum of 100 items per page
         $perPage = min(max($request->integer('per_page', 50), 1), 100);
-        return response()->json(
-            $q->paginate($perPage)->appends($request->query())
-        );
+        
+        return PlanItemResource::collection($q->paginate($perPage)->appends($request->query()));
+        //return response()->json($q->paginate($perPage)->appends($request->query()));
         //return response()->json($travelPlan->planItems()->with('activity')->get());
     }
 
@@ -133,7 +135,8 @@ class PlanItemController extends Controller
 
                 $travelPlan->increment('total_cost', $amount);
 
-                return response()->json($planItem, Response::HTTP_CREATED);
+                return (new PlanItemResource($planItem->load('activity')))->response()->setStatusCode(Response::HTTP_CREATED);
+                //return response()->json($planItem, Response::HTTP_CREATED);
             });
         } catch (\Throwable $e) {
             // Neočekivana greska
@@ -196,7 +199,8 @@ class PlanItemController extends Controller
 
         $planItem->update($data);
 
-        return response()->json($planItem);
+        return new PlanItemResource($planItem->load('activity'));
+        //return response()->json($planItem);
     }
 
 
@@ -210,10 +214,10 @@ class PlanItemController extends Controller
         $travelPlan->decrement('total_cost', $planItem->amount);
         $planItem->delete();
 
-        //return response()->noContent();
-        return response()->json([
-            'data'    => null,
-            'message' => 'Plan item deleted successfully.'
-        ], 200);
+        return response()->noContent();
+        //return response()->json([
+          //  'data'    => null,
+           // 'message' => 'Plan item deleted successfully.'
+        //], 200);
     }
 }

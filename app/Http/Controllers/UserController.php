@@ -7,6 +7,8 @@ use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Response;
 use Carbon\Carbon;
+use App\Http\Resources\UserResource;
+use App\Http\Resources\TravelPlanResource;
 
 class UserController extends Controller
 {
@@ -15,8 +17,11 @@ class UserController extends Controller
      */
     public function index() 
     { 
-        $users=User::all(); 
-        return response()->json($users);
+        //$users=User::all(); 
+        //return response()->json($users);
+
+        $users=User::paginate(15); 
+        return UserResources::collection($users);
     }
 
     /**
@@ -44,7 +49,8 @@ class UserController extends Controller
         if (is_null($user)){ 
             return response()->json(['message' => 'Data not found'], 404);
         } 
-        return response()->json($user);      
+        return new UserResource($user->travelPlans()->with(['planItems.activity']));
+        //return response()->json($user);      
     } 
 
     /**
@@ -93,11 +99,14 @@ class UserController extends Controller
         //filter by upcoming plans
 
         $query = $user->travelPlans()
+                ->with(['planItems.activity'])
                 ->whereDate('start_date', '>=', Carbon::today())
                 ->orderBy('start_date', 'asc');
 
         $perPage = $request->integer('per_page', 15);
-        return response()->json($query->paginate($perPage));
+        
+        return TravelPlanResource::collection($query->paginate($perPage)->appends($request->$query()));
+        //return response()->json($query->paginate($perPage));
 
         // bez paginacije: return response()->json(['data' => $query->get()]);
         //sve planove korisnika: return response()->json($user->travelPlans);

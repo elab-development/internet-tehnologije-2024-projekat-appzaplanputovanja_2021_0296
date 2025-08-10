@@ -67,6 +67,12 @@ Route::get(
     [\App\Http\Controllers\TravelPlanController::class, 'exportPdf']
 )->name('travel-plans.export.pdf');
 
+/**Route::get(
+    'travel-plans/search', 
+    [TravelPlanController::class, 'search']
+    )->name('travel-plans.search'); //kada dodamo autentifikaciju
+*/
+
 Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
     return $request->user();
 });

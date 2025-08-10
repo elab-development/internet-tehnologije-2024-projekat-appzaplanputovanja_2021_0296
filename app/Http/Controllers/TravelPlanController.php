@@ -14,6 +14,8 @@ use Illuminate\Support\Facades\DB;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Support\Str;
 use Illuminate\Support\Arr;
+use App\Http\Resources\TravelPlanResource;
+use App\Http\Resources\PlanItemResource;
 
 class TravelPlanController extends Controller
 {
@@ -22,7 +24,9 @@ class TravelPlanController extends Controller
      */
     public function index(Request $request)
     {
-        $q = TravelPlan::with('planItems');
+        $q = TravelPlan::with(['planItems' => function($q) {
+            $q->orderBy('time_from');
+        }, 'planItems.activity','user']);
 
         // Filter by user_id
         if ($userId = $request->integer('user_id')) {
@@ -46,8 +50,9 @@ class TravelPlanController extends Controller
         }
 
         $perPage = min(max($request->integer('per_page', 10), 1), 100);
-        return response()->json($q->paginate($perPage)->appends($request->query()));
-
+        
+        return TravelPlanResource::collection($q->paginate($perPage)->appends($request->query()));
+        //return response()->json($q->paginate($perPage)->appends($request->query()));
         //return response()->json(TravelPlan::with('planItems')->paginate(10)); // Return paginated list of travel plans with their items
     }
 
@@ -82,7 +87,8 @@ class TravelPlanController extends Controller
             // 3) ostale aktivnosti po preferencijama, bez preklapanja i u okviru budžeta
             $this->fillWithMatchingActivities($plan);
 
-            return response()->json($plan->load('planItems'), 201);
+            return (new TravelPlanResource($plan->load(['planItems.activity','user'])))->response()->setStatusCode(201);
+            //return response()->json($plan->load('planItems'), 201);
         });
     }
 
@@ -91,7 +97,8 @@ class TravelPlanController extends Controller
      */
     public function show(TravelPlan $travelPlan)
     {
-        return response()->json($travelPlan->load('planItems')); // Return a single travel plan with its items
+        return new TravelPlanResource($travelPlan->load(['planItems.activity','user']));
+        //return response()->json($travelPlan->load('planItems')); // Return a single travel plan with its items
     }
 
     /**
@@ -123,10 +130,8 @@ class TravelPlanController extends Controller
 
         $travelPlan->update($data);
 
-        return response()->json([
-            'message' => 'Travel plan uspešno ažuriran.',
-            'data'    => $travelPlan->fresh()
-        ]);
+        return new TravelPlanResource($travelPlan->fresh()->load(['planItems.activity','user']));
+       // return response()->json(['message' => 'Travel plan uspešno ažuriran.','data'    => $travelPlan->fresh()        ]);
     }
 
     /**
@@ -136,11 +141,8 @@ class TravelPlanController extends Controller
     {
         $travelPlan->delete();
 
-        //return response()->noContent();
-        return response()->json([
-            'data'    => null,
-            'message' => 'Travel plan deleted successfully.'
-        ], 200);
+        return response()->noContent();
+        //return response()->json(['data'    => null,'message' => 'Travel plan deleted successfully.'], 200);
     }
     private function generateMandatoryItems(TravelPlan $plan): void
     {
@@ -406,7 +408,7 @@ class TravelPlanController extends Controller
 
         $plan->increment('total_cost', $amount);
 
-        return $item;
+        return (new PlanItemResource($planItem->load('activity')))->response()->setStatusCode(Response::HTTP_CREATED);
     }
 
 
@@ -433,7 +435,7 @@ class TravelPlanController extends Controller
        //plan sa stavkama, sortiran po vremenu
         $q = TravelPlan::with(['planItems' => function($q) {
             $q->orderBy('time_from');
-        }, 'planItems.activity']);
+        }, 'planItems.activity','user']);
 
         if (!empty($data['user_id'])) {
             $q->where('user_id', $data['user_id']);
@@ -471,9 +473,8 @@ class TravelPlanController extends Controller
         //  Paginacija
         $perPage = $data['per_page'] ?? 10;
 
-        return response()->json(
-            $q->paginate($perPage)->appends($request->query())
-        );
+        return TravelPlanResource::collection($q->paginate($perPage)->appends($request->query()));
+       // return response()->json($q->paginate($perPage)->appends($request->query()));
     }
 */
     public function exportPdf(Request $request, TravelPlan $travelPlan)
