@@ -61,6 +61,12 @@ Route::get('settings/{key}', [SettingController::class, 'show']);
 Route::post('settings', [SettingController::class, 'upsert']);      // { key, value }
 Route::post('settings/batch', [SettingController::class, 'batch']); // { items: [ {key,value}, ... ] }
 
+//export plan as PDF
+Route::get(
+    'travel-plans/{travel_plan}/export/pdf', 
+    [\App\Http\Controllers\TravelPlanController::class, 'exportPdf']
+)->name('travel-plans.export.pdf');
+
 Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
     return $request->user();
 });
