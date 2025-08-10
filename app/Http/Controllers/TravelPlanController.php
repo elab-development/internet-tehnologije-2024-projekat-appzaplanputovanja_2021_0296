@@ -11,15 +11,44 @@ use Illuminate\Validation\Rule;
 use Illuminate\Http\JsonResponse;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
+use Barryvdh\DomPDF\Facade\Pdf;
+use Illuminate\Support\Str;
+use Illuminate\Support\Arr;
 
 class TravelPlanController extends Controller
 {
     /**
      * Display a listing of the resource.
      */
-    public function index()
+    public function index(Request $request)
     {
-        return response()->json(TravelPlan::with('planItems')->paginate(10)); // Return paginated list of travel plans with their items
+        $q = TravelPlan::with('planItems');
+
+        // Filter by user_id
+        if ($userId = $request->integer('user_id')) {
+            $q->where('user_id', $userId);
+        }
+
+        // Filter by destination
+        if ($dest = $request->query('destination')) {
+            $q->where('destination', $dest);
+        }
+
+        //Filter by time interval overlap
+        $dateFrom = $request->date('date_from');
+        $dateTo   = $request->date('date_to');
+
+        if ($dateFrom || $dateTo) {
+            $q->where(function($qq) use ($dateFrom, $dateTo) {
+                if ($dateFrom) $qq->where('end_date', '>=', $dateFrom); //plan ends after (or on) date_from
+                if ($dateTo)   $qq->where('start_date', '<=', $dateTo); //plan starts before (or on) date_to
+            });
+        }
+
+        $perPage = min(max($request->integer('per_page', 10), 1), 100);
+        return response()->json($q->paginate($perPage)->appends($request->query()));
+
+        //return response()->json(TravelPlan::with('planItems')->paginate(10)); // Return paginated list of travel plans with their items
     }
 
     /**
@@ -115,7 +144,7 @@ class TravelPlanController extends Controller
     }
     private function generateMandatoryItems(TravelPlan $plan): void
     {
-        // podrazumevana vemena- admin posle moze rucno menjati PlanItem
+        // podrazumevana vremena- admin posle moze rucno menjati PlanItem
         $outboundStart  = Setting::getValue('outbound_start', '08:00');
         $checkinTime    = Setting::getValue('checkin_time',   '14:00');
         $checkoutTime   = Setting::getValue('checkout_time',  '09:00');
@@ -381,5 +410,106 @@ class TravelPlanController extends Controller
     }
 
 
+/**public function search(Request $request): JsonResponse //kada zavrsimo autentifikaciju
+    {
+        // Validacija ulaznih parametara
+        $data = $request->validate([
+            'user_id'        => ['sometimes','integer','exists:users,id'], //kada zavrsimo autentifikaciju
+            'destination'   => ['sometimes','string','max:255'],
+            'q'             => ['sometimes','string','max:255'], // tekstualna pretraga
+            'date_from'     => ['sometimes','date'],
+            'date_to'       => ['sometimes','date','after_or_equal:date_from'],
+            'budget_min'    => ['sometimes','numeric','min:0'],
+            'budget_max'    => ['sometimes','numeric','gte:budget_min'],
+            'total_cost_max'=> ['sometimes','numeric','min:0'],
+            'passengers'    => ['sometimes','integer','min:1'],
+            'preference'    => ['sometimes','array'],            // npr. preference[]=want_culture
+            'preference.*'  => ['string','max:100'],
+            'sort_by'       => ['sometimes', Rule::in(['start_date','end_date','budget','total_cost','destination'])],
+            'sort_dir'      => ['sometimes', Rule::in(['asc','desc'])],
+            'per_page'      => ['sometimes','integer','min:1','max:100'],
+        ]);
+
+       //plan sa stavkama, sortiran po vremenu
+        $q = TravelPlan::with(['planItems' => function($q) {
+            $q->orderBy('time_from');
+        }, 'planItems.activity']);
+
+        if (!empty($data['user_id'])) {
+            $q->where('user_id', $data['user_id']);
+        }
+
+        // preklapanje sa [date_from, date_to]
+        $from = $data['date_from'] ?? null;
+        $to   = $data['date_to']   ?? null;
+        if ($from || $to) {
+            $q->where(function ($qq) use ($from, $to) {
+                if ($from) $qq->where('end_date', '>=', $from);
+                if ($to)   $qq->where('start_date', '<=', $to);
+            });
+        }
+
+        // Višestruke preferencije
+        if (!empty($data['preference'])) {
+            $prefs = (array) $data['preference'];
+            $q->where(function ($qq) use ($prefs) {
+                foreach ($prefs as $p) {
+                    $qq->orWhereJsonContains('preferences', $p);
+                }
+            });
+        }
+
+        //Tekstualna pretraga po polju start_location/destination
+        if (!empty($data['q'])) {
+            $term = trim($data['q']);
+            $q->where(function ($qq) use ($term) {
+                $qq->where('start_location', 'LIKE', "%{$term}%")
+                ->orWhere('destination', 'LIKE', "%{$term}%");
+            });
+        }
+
+        //  Paginacija
+        $perPage = $data['per_page'] ?? 10;
+
+        return response()->json(
+            $q->paginate($perPage)->appends($request->query())
+        );
+    }
+*/
+    public function exportPdf(Request $request, TravelPlan $travelPlan)
+    {
+        $travelPlan->load(['user','planItems.activity']);
+
+        // sortiraj stavke po vremenu
+        $items = $travelPlan->planItems->sortBy('time_from');
+
+
+        //  agregarane stavke
+        $totals = [
+            'count'        => $items->count(),
+            'duration_min' => $items->sum(function ($i) {
+                $from = Carbon::parse($i->time_from);
+                $to   = Carbon::parse($i->time_to);
+                return $from->diffInMinutes($to);
+            }),
+            'amount'       => $items->sum('amount'),
+        ];
+
+        // bezbedno ime fajla: travel-plan-UserName-Destination.pdf
+        $safeUser = preg_replace('/[^A-Za-z0-9_\-]/', '_', optional($travelPlan->user)->name ?? 'user');
+        $safeDest = preg_replace('/[^A-Za-z0-9_\-]/', '_', $travelPlan->destination);
+        $filename = "travel-plan-{$safeUser}-{$safeDest}.pdf";
+
+        $pdf = Pdf::loadView('pdf.travel-plan-full', [
+            'plan'    => $travelPlan,
+            'items'   => $items,
+            'totals'  => $totals,
+        ])->setPaper('a4');
+
+        // ?inline=1 za pregled u browseru/Postman-u
+        return $request->boolean('inline')
+            ? $pdf->stream($filename)
+            : $pdf->download($filename);
+        }
 
 }

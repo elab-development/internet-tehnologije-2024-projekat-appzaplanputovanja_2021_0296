@@ -14,9 +14,31 @@ use App\Models\TravelPlan;
 class PlanItemController extends Controller
 {
     // vraća sve stavke za dati TravelPlan
-    public function index(TravelPlan $travelPlan) //radimo  u okviru tacno odredjenog travel plana
+    public function index(TravelPlan $travelPlan, Request $request) //radimo  u okviru tacno odredjenog travel plana
     {
-        return response()->json($travelPlan->planItems()->with('activity')->get());
+        $q = $travelPlan->planItems()->with('activity');  //vuce i relaciju activity
+
+        // Filter by activity type
+        if ($type = $request->query('type')) {
+            $q->whereHas('activity', fn($a) => $a->where('type', $type));
+        }
+        // Filter by time interval
+        $winFrom = $request->query('from');
+        $winTo   = $request->query('to');
+        if ($winFrom || $winTo) {
+            $wf = $winFrom ? Carbon::parse($winFrom) : Carbon::minValue();
+            $wt = $winTo   ? Carbon::parse($winTo)   : Carbon::maxValue();
+            $q->where(function($qq) use ($wf,$wt){
+                $qq->where('time_from','<=',$wt)
+                ->where('time_to','>=',$wf);
+            });
+        }
+        // Pagination with a maximum of 100 items per page
+        $perPage = min(max($request->integer('per_page', 50), 1), 100);
+        return response()->json(
+            $q->paginate($perPage)->appends($request->query())
+        );
+        //return response()->json($travelPlan->planItems()->with('activity')->get());
     }
 
     // validira activity_id i time_from, računa time_to, amount i name pa kreira novu stavku

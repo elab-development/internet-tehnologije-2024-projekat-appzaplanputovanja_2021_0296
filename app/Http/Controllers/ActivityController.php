@@ -24,12 +24,40 @@ class ActivityController extends Controller
             $query->where('type', $type);
         }
 
-        // Filter by a single preference type
-        if ($pref = $request->query('preference')) {
-            $query->whereJsonContains('preference_types', $pref);
+        // Filter by location
+        if ($loc = $request->query('location')) {
+            $query->where('location', $loc);
         }
 
-        return response()->json($query->paginate(10));
+        // Filter by min price
+        if (!is_null($request->query('price_min'))) {
+            $query->where('price', '>=', (float)$request->query('price_min'));
+        }
+
+        // Filter by max price
+        if (!is_null($request->query('price_max'))) {
+        $query->where('price', '<=', (float)$request->query('price_max'));
+        }
+
+        // Filter by preferences
+        if ($prefs = $request->query('preference')) {
+            $prefs = (array) $prefs;
+            $q->where(function ($qq) use ($prefs) {
+                foreach ($prefs as $p) {
+                    $qq->orWhereJsonContains('preference_types', $p);
+                }
+            });
+        }
+
+        $sortBy  = $request->query('sort_by', 'location');
+        $sortDir = $request->query('sort_dir', 'asc');
+
+        if (in_array($sortBy, ['name','price','duration','location']) &&
+            in_array($sortDir, ['asc','desc'])) {
+            $q->orderBy($sortBy, $sortDir);
+        }
+
+        return response()->json($query->paginate(50));
     }
 
     /**
