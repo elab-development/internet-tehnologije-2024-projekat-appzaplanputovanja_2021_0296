@@ -3,7 +3,6 @@
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
-use Illuminate\Support\Facades\DB;
 
 return new class extends Migration
 {
@@ -12,11 +11,11 @@ return new class extends Migration
      */
     public function up(): void
     {
-       DB::statement(
-            'ALTER TABLE `travel_plans` 
-             ADD CONSTRAINT `check_total_cost_budget` 
-             CHECK (`total_cost` <= `budget`)'
-        );
+        Schema::create('settings', function (Blueprint $table) {
+            $table->string('key')->primary();
+            $table->string('value');        // čuvamo HH:MM ili broj u stringu
+            $table->timestamps();
+        });
     }
 
     /**
@@ -24,9 +23,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-         DB::statement(
-            'ALTER TABLE `travel_plans` 
-             DROP CHECK `check_total_cost_budget`'
-        );
+        Schema::dropIfExists('settings');
     }
 };

@@ -7,6 +7,8 @@ use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Response;
+use Illuminate\Database\QueryException;
+
 
 class ActivityController extends Controller
 {
@@ -36,20 +38,24 @@ class ActivityController extends Controller
     public function store(Request $request)
     {
         $data = $request->validate([
-            'type' => [
-                'required',
-                Rule::in(Activity::availableTypes()),        // <–– ovde zovemo statičku f-ju koja vraća niz dozvoljenih tipova 
-            ],
-            'name'             => 'required|string|max:255',
-            'price'            => 'required|numeric|min:0',
-            'duration'         => 'required|integer|min:0',
-            'location'         => 'required|string|max:255',
-            'content'          => 'nullable|string',
+            'type'               => ['required',
+                       'in:Transport,Accommodation,Food&Drink,Culture&Sightseeing,
+                        Shopping&Souvenirs,Nature&Adventure,Relaxation&Wellness,
+                        Family-Friendly,Educational&Volunteering,Entertainment&Leisure,other' ],    
+            'name'               => 'required|string|max:255',
+            'price'              => 'required|numeric|min:0',
+            'duration'           => 'required|integer|min:0',
+            'location'           => 'required|string|max:255',
+            'content'            => 'nullable|string',
             'preference_types'   => 'required|array',
             // Za validaciju svakog elementa preference_types niza:
-            'preference_types.*' => [
-                Rule::in(Activity::availablePreferenceTypes()),
-            ],
+            'preference_types.*' => [   
+                                    Rule::in(Activity::availablePreferenceTypes()), ],
+            'transport_mode'     => ['required_if:type,Transport','prohibited_unless:type,Transport',
+                                    'in:airplane,train,car,bus,ferry,cruise ship','required_if:type,Transport'],
+            'accommodation_class'=> ['required_if:type,Accommodation','prohibited_unless:type,Accommodation',
+                                    'in:hostel,guesthouse,budget_hotel,standard_hotel,boutique_hotel,luxury_hotel,
+                                    resort,apartment,bed_and_breakfast,villa,mountain_lodge,camping,glamping',],
         ]);
 
         $activity = Activity::create($data);
@@ -71,21 +77,23 @@ class ActivityController extends Controller
     public function update(Request $request, Activity $activity)
     {
         $data = $request->validate([
-            'type' => [
-                'sometimes',
-                'required',
-                Rule::in(Activity::availableTypes()),
-            ],
-            'name'             => 'sometimes|required|string|max:255', //Ovo polje nije obavezno da se salje, ali ako se posalje, ne sme biti prazno i mora biti ispravnog tipa.
-            'price'            => 'sometimes|required|numeric|min:0',
-            'duration'         => 'sometimes|required|integer|min:0',
-            'location'         => 'sometimes|required|string|max:255',
-            'content'          => 'nullable|string',
+            'type'               => ['sometimes','required',
+                       'in:Transport,Accommodation,Food&Drink,Culture&Sightseeing,
+                        Shopping&Souvenirs,Nature&Adventure,Relaxation&Wellness,
+                        Family-Friendly,Educational&Volunteering,Entertainment&Leisure,other' ],   
+            'name'               => 'sometimes|required|string|max:255', //Ovo polje nije obavezno da se salje, ali ako se posalje, ne sme biti prazno i mora biti ispravnog tipa.
+            'price'              => 'sometimes|required|numeric|min:0',
+            'duration'           => 'sometimes|required|integer|min:0',
+            'location'           => 'sometimes|required|string|max:255',
+            'content'            => 'sometimes|nullable|string',
             'preference_types'   => 'sometimes|required|array',
-            'preference_types' => [
-                Rule::in(Activity::availablePreferenceTypes()),
-
-            ],
+            'preference_types.*' => [
+                                    Rule::in(Activity::availablePreferenceTypes()),],
+            'transport_mode'     => ['sometimes','required_if:type,Transport','prohibited_unless:type,Transport',
+                                    'in:airplane,train,car,bus,ferry,cruise ship','required_if:type,Transport'],
+            'accommodation_class'=> ['sometimes','required_if:type,Accommodation','prohibited_unless:type,Accommodation',
+                                    'in:hostel,guesthouse,budget_hotel,standard_hotel,boutique_hotel,luxury_hotel,
+                                    resort,apartment,bed_and_breakfast,villa,mountain_lodge,camping,glamping','required_if:type,Accommodation'],
         ]);
 
         $activity->update($data);
@@ -98,13 +106,15 @@ class ActivityController extends Controller
      */
     public function destroy(Activity $activity)
     {
-        $activity->delete();
-
-        //return response()->noContent();
-
-        return response()->json([
-            'data'    => null,
-            'message' => 'Aktivity deleted successfully.'
-        ], 200);
+        try {
+            $activity->delete();
+            return response()->json(['data' => null, 'message' => 'Activity deleted successfully.'], 200);
+        } catch (QueryException $e) {
+            return response()->json([  // Handle foreign key constraint violation- Plan items are linked to this activity
+                'message' => 'Activity is linked to plan items and cannot be deleted.'
+            ], 409);
+        } catch (\Throwable $e) {
+            return response()->json(['message' => 'Failed to delete activity.'], 500);
+        }
     }
 }

@@ -42,7 +42,7 @@ class UserController extends Controller
     { 
         $user = User::find($user_id); 
         if (is_null($user)){ 
-            return response()->json('Data not found', 404); 
+            return response()->json(['message' => 'Data not found'], 404);
         } 
         return response()->json($user);      
     } 
@@ -68,10 +68,21 @@ class UserController extends Controller
      */
     public function destroy(User $user)
     {
+        // Provera da li postoje budući planovi putovanja
+        $hasFuturePlans = $user->travelPlans()
+            ->where('start_date', '>', now())
+            ->exists();
+
+        if ($hasFuturePlans) {
+            return response()->json([
+                'error' => 'The user cannot be deleted because they have future travel plans.'
+            ], 409); // 409 Conflict
+        }
+
+        // Ako nema budućih planova, obriši korisnika
         $user->delete();
-        //return response()->noContent();
+
         return response()->json([
-            'data'    => null,
             'message' => 'User deleted successfully.'
         ], 200);
     }
