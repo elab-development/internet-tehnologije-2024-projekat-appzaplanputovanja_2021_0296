@@ -25,7 +25,7 @@ class Activity extends Model
         return $this->hasMany(PlanItem::class); // 1 activity can have many plan items
     }
 
-    public static function availableTypes(): array
+   /* public static function availableTypes(): array
     {
         return [
             'Transport',
@@ -40,7 +40,7 @@ class Activity extends Model
             'Entertainment&Leisure',
             'other',
         ];
-    }
+    }*/
     public static function availablePreferenceTypes(): array
     {
         return [

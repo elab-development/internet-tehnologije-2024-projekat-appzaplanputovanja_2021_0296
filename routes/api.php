@@ -6,6 +6,7 @@ use App\Http\Controllers\TravelPlanController;
 use App\Http\Controllers\ActivityController;
 use App\Http\Controllers\PlanItemController;
 use App\Http\Controllers\UserController;
+use App\Http\Controllers\SettingController;
 
 /*
 |--------------------------------------------------------------------------
@@ -53,6 +54,12 @@ Route::get(
     'users/{user}/travel-plans',
     [UserController::class, 'plans']
 )->name('users.travel-plans');
+
+//admin
+Route::get('settings', [SettingController::class, 'index']);
+Route::get('settings/{key}', [SettingController::class, 'show']);
+Route::post('settings', [SettingController::class, 'upsert']);      // { key, value }
+Route::post('settings/batch', [SettingController::class, 'batch']); // { items: [ {key,value}, ... ] }
 
 Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
     return $request->user();

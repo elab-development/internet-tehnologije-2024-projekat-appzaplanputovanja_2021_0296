@@ -3,34 +3,80 @@
 namespace Database\Factories;
 
 use Illuminate\Database\Eloquent\Factories\Factory;
+use App\Models\Activity;
 
-/**
- * @extends \Illuminate\Database\Eloquent\Factories\Factory<\App\Models\Activity>
- */
 class ActivityFactory extends Factory
 {
-    /**
-     * Define the model's default state.
-     *
-     * @return array<string, mixed>
-     */
+    protected $model = Activity::class;
+
+    private array $types = [
+        'Transport','Accommodation','Food&Drink','Culture&Sightseeing',
+        'Shopping&Souvenirs','Nature&Adventure','Relaxation&Wellness',
+        'Family-Friendly','Educational&Volunteering','Entertainment&Leisure','other'
+    ];
+
+    private array $transportModes = ['airplane','train','car','bus','ferry','cruise ship'];
+    private array $accClasses = [
+        'hostel','guesthouse','budget_hotel','standard_hotel','boutique_hotel','luxury_hotel',
+        'resort','apartment','bed_and_breakfast','villa','mountain_lodge','camping','glamping'
+    ];
+
     public function definition(): array
     {
-        $locations = ['Paris', 'Prague','Amsterdam'];
-        return [
-            'name' => $this->faker->words(2, true),
-            'location' => $this->faker->randomElement($locations),
-            'type' => $this->faker->randomElement([ 'Transport', 'Accommodation',
-                         'Food&Drink', 'Culture&Sightseeing',
-                        'Shopping&Souvenirs', 'Relaxation&Wellness',
-                    'Educational&Volunteering','Entertainment&Leisure']),
-            'price' => $this->faker->numberBetween(1,100), //$this->faker->randomFloat(2, 10, 200),
-            'content' => $this->faker->paragraph(),
-            'duration' => $this->faker->numberBetween(30, 240), // Duration in minutes
-            'preference_types' => $this->faker->randomElements([
-                 'travel_with_children', 'enjoy_nature',  'love_food_and_drink', 'want_to_relax', 'want_culture', 'seek_fun', 'adventurous', 'avoid_crowds', 'comfortable_travel', 'cafe_sitting',
-            'shopping','want_to_learn', 'active_vacation', 'research_of_tradition',
-            ], rand(3, 4)),
+        $type = $this->faker->randomElement($this->types);
+
+        // random skup preferencija iz Activity::availablePreferenceTypes()
+        $prefsAll = Activity::availablePreferenceTypes(); 
+        shuffle($prefsAll);
+        $prefs = array_slice($prefsAll, 0, $this->faker->numberBetween(1, min(4, count($prefsAll))));
+
+        $data = [
+            'type'             => $type,
+            'name'             => $this->faker->words(3, true),
+            'price'            => $this->faker->randomFloat(2, 5, 300),
+            'duration'         => $this->faker->numberBetween(30, 240), // min
+            'location'         => $this->faker->randomElement(['Prague','Vienna','Budapest','Belgrade','Zagreb']),
+            'content'          => $this->faker->optional()->sentence(12),
+            'preference_types' => $prefs,
         ];
+
+        if ($type === 'Transport') {
+            $data['transport_mode'] = $this->faker->randomElement($this->transportModes);
+            $data['duration'] = $this->faker->numberBetween(60, 240);
+            $data['name'] = "Transport ".$this->faker->randomElement(['From','']) ." " . $data['location'];
+        } elseif ($type === 'Accommodation') {
+            $data['accommodation_class'] = $this->faker->randomElement($this->accClasses);
+            $data['duration'] = $this->faker->numberBetween(60, 120);
+            $data['name'] = "Accommodation in ".$data['location'];
+        }
+
+        return $data;
+    }
+
+    public function forLocation(string $location): self
+    {
+        return $this->state(fn() => ['location' => $location]);
+    }
+
+    public function transport(string $mode, string $location): self
+    {
+        return $this->state(fn() => [
+            'type' => 'Transport',
+            'transport_mode' => $mode,
+            'location' => $location,
+            'duration' => 120,
+            'name' => "Transport {$location}",
+        ]);
+    }
+
+    public function accommodation(string $class, string $location): self
+    {
+        return $this->state(fn() => [
+            'type' => 'Accommodation',
+            'accommodation_class' => $class,
+            'location' => $location,
+            'duration' => 90,
+            'name' => "Accommodation in {$location}",
+        ]);
     }
 }

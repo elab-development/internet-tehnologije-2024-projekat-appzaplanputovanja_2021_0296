@@ -2,17 +2,26 @@
 
 namespace Database\Seeders;
 
-use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 use App\Models\User;
 
 class UserSeeder extends Seeder
 {
-    /**
-     * Run the database seeds.
-     */
     public function run(): void
     {
-        User::factory(2)->create();  //kreira 2 korisnika
+        //generiši 3 random korisnika
+        //User::factory()->count(3)->create();
+
+        //3 poznata naloga
+        User::factory()->create([
+            'name' => 'Masa',
+            'email' => 'masaljekocevic@gmail.com',
+            'password' => 'masa123',
+        ]);
+        User::factory()->create([
+            'name' => 'Tasa',
+            'email' => 'tamaralukovic@gmail.com',
+            'password' => 'tasa456',
+        ]);
     }
 }

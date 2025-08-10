@@ -3,36 +3,49 @@
 namespace Database\Factories;
 
 use Illuminate\Database\Eloquent\Factories\Factory;
+use App\Models\TravelPlan;
 use App\Models\User;
+use App\Models\Activity;
+use Illuminate\Support\Carbon;
 
-/**
- * @extends \Illuminate\Database\Eloquent\Factories\Factory<\App\Models\TravelPlan>
- */
 class TravelPlanFactory extends Factory
 {
-    /**
-     * Define the model's default state.
-     *
-     * @return array<string, mixed>
-     */
+    protected $model = TravelPlan::class;
+
+    private array $transportModes = ['airplane','train','car','bus','ferry','cruise ship'];
+    private array $accClasses = [
+        'hostel','guesthouse','budget_hotel','standard_hotel','boutique_hotel','luxury_hotel',
+        'resort','apartment','bed_and_breakfast','villa','mountain_lodge','camping','glamping'
+    ];
+
     public function definition(): array
     {
-        $locations = ['Paris','Prague', 'Amsterdam'];
-        $startDate = $this->faker->dateTimeBetween('now', '+1 month');
+        $user = User::inRandomOrder()->first() ?? User::factory()->create();
+        $locations = Activity::query()->distinct()->pluck('location')->toArray();
+        if (empty($locations)) {
+            $locations = ['Prague'];
+        }
+        $destination = $this->faker->randomElement($locations);
+
+        $start = Carbon::now()->addDays($this->faker->numberBetween(10, 90))->startOfDay();
+        $end   = (clone $start)->addDays($this->faker->numberBetween(2, 6));
+
+        $prefsAll = Activity::availablePreferenceTypes();
+        shuffle($prefsAll);
+        $prefs = array_slice($prefsAll, 0, $this->faker->numberBetween(2, 5));
+
         return [
-           'user_id' => User::factory(),
-            'start_location' => $this->faker->city(),
-            'destination' => $this->faker->randomElement($locations),//$this->faker->city(), //$Activity->location, 
-            'start_date' => $startDate,
-            'end_date' => (clone $startDate)->modify('+' . rand(2, 6) . ' days'),
-            'budget' => $this->faker->numberBetween(1000, 5000), 
-            'passenger_count' => $this->faker->numberBetween(1, 3),
-            'total_cost' => 0, // This will be calculated later
-            'preferences' =>  $this->faker->randomElements([
-                 'love_food_and_drink', 'want_culture',
-                  'seek_fun','adventurous',  'cafe_sitting', 'shopping',
-                  'want_to_learn', 'active_vacation', 'research_of_tradition',
-            ], rand(2, 3)),
-    ];
+            'user_id'            => $user->id,
+            'start_location'     => $this->faker->randomElement(['Belgrade','Novi Sad','Niš','Prague','Vienna']),
+            'destination'        => $destination,
+            'start_date'         => $start->toDateString(),
+            'end_date'           => $end->toDateString(),
+            'budget'             => $this->faker->numberBetween(800, 4000),
+            'passenger_count'    => $this->faker->numberBetween(1, 4),
+            'preferences'        => $prefs,
+            'total_cost'         => 0, // biće uvećavan dodavanjem PlanItem-a
+            'transport_mode'     => $this->faker->randomElement($this->transportModes),
+            'accommodation_class'=> $this->faker->randomElement($this->accClasses),
+        ];
     }
 }
