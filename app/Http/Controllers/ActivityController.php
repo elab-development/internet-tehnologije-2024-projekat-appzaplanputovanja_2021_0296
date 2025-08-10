@@ -8,6 +8,7 @@ use Illuminate\Validation\Rule;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Response;
 use Illuminate\Database\QueryException;
+use App\Http\Resources\ActivityResource;
 
 
 class ActivityController extends Controller
@@ -42,7 +43,7 @@ class ActivityController extends Controller
         // Filter by preferences
         if ($prefs = $request->query('preference')) {
             $prefs = (array) $prefs;
-            $q->where(function ($qq) use ($prefs) {
+            $query->where(function ($qq) use ($prefs) {
                 foreach ($prefs as $p) {
                     $qq->orWhereJsonContains('preference_types', $p);
                 }
@@ -54,10 +55,10 @@ class ActivityController extends Controller
 
         if (in_array($sortBy, ['name','price','duration','location']) &&
             in_array($sortDir, ['asc','desc'])) {
-            $q->orderBy($sortBy, $sortDir);
+            $query->orderBy($sortBy, $sortDir);
         }
 
-        return response()->json($query->paginate(50));
+        return ActivityResource::collection($query->paginate(10)->appends($request->query()));
     }
 
     /**
@@ -88,7 +89,8 @@ class ActivityController extends Controller
 
         $activity = Activity::create($data);
 
-        return response()->json($activity, 201);
+       // return response()->json($activity, 201);
+        return (new ActivityResource($activity))->response()->setStatusCode(201);
     }
 
     /**
@@ -96,7 +98,8 @@ class ActivityController extends Controller
      */
     public function show(Activity $activity)
     {
-        return response()->json($activity);
+        //return response()->json($activity);
+        return new ActivityResource($activity);
     }
 
     /**
@@ -126,7 +129,8 @@ class ActivityController extends Controller
 
         $activity->update($data);
 
-        return response()->json($activity);
+        //return response()->json($activity);
+        return new ActivityResource($activity);
     }
 
     /**
@@ -136,13 +140,15 @@ class ActivityController extends Controller
     {
         try {
             $activity->delete();
-            return response()->json(['data' => null, 'message' => 'Activity deleted successfully.'], 200);
+            //return response()->json(['data' => null, 'message' => 'Activity deleted successfully.'], 200);
+            return response()->noContent();
         } catch (QueryException $e) {
             return response()->json([  // Handle foreign key constraint violation- Plan items are linked to this activity
                 'message' => 'Activity is linked to plan items and cannot be deleted.'
             ], 409);
         } catch (\Throwable $e) {
             return response()->json(['message' => 'Failed to delete activity.'], 500);
+            
         }
     }
 }
