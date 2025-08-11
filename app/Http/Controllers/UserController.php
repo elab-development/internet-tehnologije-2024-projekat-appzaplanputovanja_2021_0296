@@ -94,7 +94,7 @@ class UserController extends Controller
     }
 
     //GET /api/users/{user}/travel-plans
-    public function plans(User $user, Request $request): JsonResponse
+    public function plans(User $user, Request $request)
     {
         //filter by upcoming plans
 
@@ -108,7 +108,7 @@ class UserController extends Controller
         return TravelPlanResource::collection($query->paginate($perPage)->appends($request->query()));
         //return response()->json($query->paginate($perPage));
 
-        // bez paginacije: return response()->json(['data' => $query->get()]);
+        // bez paginacije- return response()->json(['data' => $query->get()]);
         //sve planove korisnika: return response()->json($user->travelPlans);
     }
 
