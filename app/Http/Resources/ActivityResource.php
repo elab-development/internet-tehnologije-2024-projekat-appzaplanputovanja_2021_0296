@@ -15,9 +15,9 @@ class ActivityResource extends JsonResource
     public function toArray(Request $request): array
     {
        return [
-            //'id'                  => $this->id,
+            'id'                  => $this->id,
             'type'                => $this->type,        // enum
-            'name'                => $this->name,
+            //'name'                => $this->name,
             'price'               => (float) $this->price,
             'duration'            => (int) $this->duration, // minuti
             'location'            => $this->location,

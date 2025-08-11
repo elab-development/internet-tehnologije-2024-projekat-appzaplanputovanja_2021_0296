@@ -35,8 +35,8 @@ class SettingController extends Controller
 
     // upsert jednog ključa
     public function upsert(Request $request) {
-        $key = $request->string('key')->trim();
-        if (!$key || !isset($this->allowed[$key])) {
+        $key = trim((string)$request->input('key'));
+        if ($key== '' || !isset($this->allowed[$key])) {
             return response()->json(['message'=>'Key not allowed'], 422);
         }
 

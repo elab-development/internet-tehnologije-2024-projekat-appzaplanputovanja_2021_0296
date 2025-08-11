@@ -59,7 +59,7 @@ class PlanItemController extends Controller
                 $returnTransport = $travelPlan->planItems()
                     ->whereHas('activity', fn($q) => $q->where('type', 'Transport'))
                     ->whereDate('time_from', $travelPlan->end_date)
-                    ->orderBy('time_from')
+                    ->orderBy('time_from','desc')
                     ->first();
 
                 // 2) Poklapanje destinacije plana i lokacije aktivnosti
@@ -165,11 +165,10 @@ class PlanItemController extends Controller
 
             // Nađi povratni transport
             $returnTransport = $travelPlan->planItems()
-                ->whereHas('activity', function ($q) use ($travelPlan) {
-                    $q->where('type', 'Transport')
-                    ->where('name', 'Transport From ' . $travelPlan->destination . ' To ' . $travelPlan->start_location . ' (' . $travelPlan->transport_mode . ')');
-                })
-                ->first();
+                    ->whereHas('activity', fn($q) => $q->where('type', 'Transport'))
+                    ->whereDate('time_from', $travelPlan->end_date)
+                    ->orderBy('time_from','desc')
+                    ->first();
             // Provera da li je time_from unutar granica plana
             if ($returnTransport && $timeTo->gt($returnTransport->time_from)) {
                 return response()->json([
