@@ -108,7 +108,7 @@ class UserController extends Controller
         return TravelPlanResource::collection($query->paginate($perPage)->appends($request->query()));
         //return response()->json($query->paginate($perPage));
 
-        // bez paginacije: return response()->json(['data' => $query->get()]);
+        // bez paginacije- return response()->json(['data' => $query->get()]);
         //sve planove korisnika: return response()->json($user->travelPlans);
     }
 

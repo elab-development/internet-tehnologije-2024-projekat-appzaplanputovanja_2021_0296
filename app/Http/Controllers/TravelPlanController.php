@@ -509,7 +509,7 @@ class TravelPlanController extends Controller
             'totals'  => $totals,
         ])->setPaper('a4');
 
-        // ?inline=1 za pregled u browseru/Postman-u
+        // ?inline=1 za pregled u browseru/Postman
         return $request->boolean('inline')
             ? $pdf->stream($filename)
             : $pdf->download($filename);

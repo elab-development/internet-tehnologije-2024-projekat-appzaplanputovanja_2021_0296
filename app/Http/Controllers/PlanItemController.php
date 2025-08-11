@@ -15,7 +15,7 @@ use App\Http\Resources\ActivityResource;
 
 class PlanItemController extends Controller
 {
-    // vraća sve stavke za dati TravelPlan
+    // vraća sve stavke za dati plan
     public function index(TravelPlan $travelPlan, Request $request) //radimo  u okviru tacno odredjenog travel plana
     {
         $q = $travelPlan->planItems()->with('activity');  //vuce i relaciju activity
