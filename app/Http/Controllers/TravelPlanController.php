@@ -184,7 +184,7 @@ class TravelPlanController extends Controller
             // 3) Transport: odlazak (start_date)
             $departureFrom = Carbon::parse($plan->start_date.' '.$outboundStart);
             $departureTo   = (clone $departureFrom)->addMinutes($transport->duration);
-            $transport->name = $transport->name ?: "Transport {$plan->start_location} → {$plan->destination} ({$plan->transport_mode})";
+            $transport->name = "Transport {$plan->start_location} → {$plan->destination} ({$plan->transport_mode})";
             $this->createItemIfBudgetAllows($plan, $transport, $departureFrom, $departureTo);
 
             // 4) Accommodation: ceo boravak
@@ -196,7 +196,7 @@ class TravelPlanController extends Controller
             // 5) Transport: povratak (end_date)
             $backFrom = Carbon::parse($plan->end_date.' '.$returnStart);
             $backTo   = (clone $backFrom)->addMinutes($transport->duration);
-            $transport->name = $transport->name ?: "Transport {$plan->destination} → {$plan->start_location} ({$plan->transport_mode})";
+            $transport->name = "Transport {$plan->destination} → {$plan->start_location} ({$plan->transport_mode})";
             $this->createItemIfBudgetAllows($plan, $transport, $backFrom, $backTo);
         });
     }

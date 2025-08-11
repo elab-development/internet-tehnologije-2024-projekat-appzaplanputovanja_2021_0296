@@ -94,7 +94,7 @@ class UserController extends Controller
     }
 
     //GET /api/users/{user}/travel-plans
-    public function plans(User $user, Request $request): JsonResponse
+    public function plans(User $user, Request $request)
     {
         //filter by upcoming plans
 

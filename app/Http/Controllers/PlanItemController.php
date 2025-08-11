@@ -211,6 +211,11 @@ class PlanItemController extends Controller
         }
 
         $travelPlan->decrement('total_cost', $planItem->amount);
+        $travelPlan->refresh();
+        if ($travelPlan->total_cost < 0) { //u slucaju da se stavka obrise vise puta
+            $travelPlan->update(['total_cost' => 0]);
+        }
+
         $planItem->delete();
 
         return response()->noContent();
