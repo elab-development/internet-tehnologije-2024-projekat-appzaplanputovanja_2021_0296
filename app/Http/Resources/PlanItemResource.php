@@ -18,7 +18,7 @@ class PlanItemResource extends JsonResource
             //'id'             => $this->id,
             //'travel_plan_id' => $this->travel_plan_id,
             //'activity_id'    => $this->activity_id,
-            //'name'           => $this->name,
+            'name'           => $this->name,
             'time_from'      => $this->time_from,
             'time_to'        => $this->time_to,
             'amount'         => (float) $this->amount,

@@ -21,7 +21,7 @@ class UserController extends Controller
         //return response()->json($users);
 
         $users=User::paginate(15); 
-        return UserResources::collection($users);
+        return UserResource::collection($users);
     }
 
     /**
@@ -45,11 +45,11 @@ class UserController extends Controller
      */
     public function show($user_id) 
     { 
-        $user = User::find($user_id); 
+        $user = User::with('travelPlans.planItems.activity')->find($user_id);
         if (is_null($user)){ 
             return response()->json(['message' => 'Data not found'], 404);
         } 
-        return new UserResource($user->travelPlans()->with(['planItems.activity']));
+        return new UserResource($user);
         //return response()->json($user);      
     } 
 
@@ -105,7 +105,7 @@ class UserController extends Controller
 
         $perPage = $request->integer('per_page', 15);
         
-        return TravelPlanResource::collection($query->paginate($perPage)->appends($request->$query()));
+        return TravelPlanResource::collection($query->paginate($perPage)->appends($request->query()));
         //return response()->json($query->paginate($perPage));
 
         // bez paginacije: return response()->json(['data' => $query->get()]);

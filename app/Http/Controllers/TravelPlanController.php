@@ -73,9 +73,10 @@ class TravelPlanController extends Controller
             'preferences'     => 'required|array',
             'preferences.*'   => [
                                 Rule::in(Activity::availablePreferenceTypes()),],
-            'transport_mode' => 'required|in:airplane,train,car,bus,ferry,cruise ship',
-            'accommodation_class' => 'required|in:hostel,guesthouse,budget_hotel,standard_hotel,boutique_hotel,
-                                    luxury_hotel,resort,apartment,bed_and_breakfast,villa,mountain_lodge,camping,glamping',
+            'transport_mode' => ['required', Rule::in(['airplane','train','car','bus','ferry','cruise ship'])],
+            'accommodation_class'=> ['required',
+                                    Rule::in(['hostel','guesthouse','budget_hotel','standard_hotel','boutique_hotel','luxury_hotel',
+                                    'resort','apartment','bed_and_breakfast','villa','mountain_lodge','camping','glamping'])],
         ]);
 
         return DB::transaction(function () use ($data) {
@@ -123,9 +124,10 @@ class TravelPlanController extends Controller
             'preferences'     => 'sometimes|required|array',
             'preferences.*'   => [
                                  Rule::in(Activity::availablePreferenceTypes()),],
-            'transport_mode' => 'sometimes|required|in:airplane,train,car,bus,ferry,cruise ship',
-            'accommodation_class' => 'sometimes|required|in:hostel,guesthouse,budget_hotel,standard_hotel,boutique_hotel,
-                                    luxury_hotel,resort,apartment,bed_and_breakfast,villa,mountain_lodge,camping,glamping',
+            'transport_mode' => ['sometimes','required', Rule::in(['airplane','train','car','bus','ferry','cruise ship'])],
+            'accommodation_class'=> ['sometimes','required',
+                                    Rule::in(['hostel','guesthouse','budget_hotel','standard_hotel','boutique_hotel','luxury_hotel',
+                                    'resort','apartment','bed_and_breakfast','villa','mountain_lodge','camping','glamping'])],
         ]);
 
         $travelPlan->update($data);
@@ -160,7 +162,7 @@ class TravelPlanController extends Controller
             $returnStart,
         ) {
             // 1) Pronadji TRANSPORT varijantu (po enum transport_mode) za datu destinaciju
-            $transport = Activity::query()
+            $transport= Activity::query()
                 ->where('type', 'Transport')
                 ->where('location', $plan->destination)
                 ->where('transport_mode', $plan->transport_mode) // enum match
@@ -373,7 +375,7 @@ class TravelPlanController extends Controller
             return null;
         }
 
-        /**if (!$ignoreOverlap && $activity->type !== 'Accommodation') {
+        if (!$ignoreOverlap && $activity->type !== 'Accommodation') {
             $overlap = PlanItem::where('travel_plan_id', $plan->id)
                 ->whereHas('activity', function ($q) {
                     $q->where('type', '!=', 'Accommodation');
@@ -391,7 +393,7 @@ class TravelPlanController extends Controller
             if ($overlap) {
                 return null;
             }
-        }*/
+        }
 
         $amount = $activity->price * $plan->passenger_count;
         if (($plan->total_cost + $amount) > $plan->budget) {
@@ -408,7 +410,7 @@ class TravelPlanController extends Controller
 
         $plan->increment('total_cost', $amount);
 
-        return (new PlanItemResource($planItem->load('activity')))->response()->setStatusCode(Response::HTTP_CREATED);
+        return $item;
     }
 
 

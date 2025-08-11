@@ -68,9 +68,9 @@ class ActivityController extends Controller
     {
         $data = $request->validate([
             'type'               => ['required',
-                       'in:Transport,Accommodation,Food&Drink,Culture&Sightseeing,
-                        Shopping&Souvenirs,Nature&Adventure,Relaxation&Wellness,
-                        Family-Friendly,Educational&Volunteering,Entertainment&Leisure,other' ],    
+                                Rule::in(['Transport','Accommodation','Food&Drink','Culture&Sightseeing',
+                                'Shopping&Souvenirs','Nature&Adventure','Relaxation&Wellness',
+                                'Family-Friendly','Educational&Volunteering','Entertainment&Leisure','other'])],    
             'name'               => 'required|string|max:255',
             'price'              => 'required|numeric|min:0',
             'duration'           => 'required|integer|min:0',
@@ -81,10 +81,10 @@ class ActivityController extends Controller
             'preference_types.*' => [   
                                     Rule::in(Activity::availablePreferenceTypes()), ],
             'transport_mode'     => ['required_if:type,Transport','prohibited_unless:type,Transport',
-                                    'in:airplane,train,car,bus,ferry,cruise ship','required_if:type,Transport'],
+                                     Rule::in(['airplane','train','car','bus','ferry','cruise ship'])],
             'accommodation_class'=> ['required_if:type,Accommodation','prohibited_unless:type,Accommodation',
-                                    'in:hostel,guesthouse,budget_hotel,standard_hotel,boutique_hotel,luxury_hotel,
-                                    resort,apartment,bed_and_breakfast,villa,mountain_lodge,camping,glamping',],
+                                    Rule::in(['hostel','guesthouse','budget_hotel','standard_hotel','boutique_hotel','luxury_hotel',
+                                    'resort','apartment','bed_and_breakfast','villa','mountain_lodge','camping','glamping'])],
         ]);
 
         $activity = Activity::create($data);
@@ -109,9 +109,9 @@ class ActivityController extends Controller
     {
         $data = $request->validate([
             'type'               => ['sometimes','required',
-                       'in:Transport,Accommodation,Food&Drink,Culture&Sightseeing,
-                        Shopping&Souvenirs,Nature&Adventure,Relaxation&Wellness,
-                        Family-Friendly,Educational&Volunteering,Entertainment&Leisure,other' ],   
+                                Rule::in(['Transport','Accommodation','Food&Drink','Culture&Sightseeing',
+                                'Shopping&Souvenirs','Nature&Adventure','Relaxation&Wellness',
+                                'Family-Friendly','Educational&Volunteering','Entertainment&Leisure','other'])],   
             'name'               => 'sometimes|required|string|max:255', //Ovo polje nije obavezno da se salje, ali ako se posalje, ne sme biti prazno i mora biti ispravnog tipa.
             'price'              => 'sometimes|required|numeric|min:0',
             'duration'           => 'sometimes|required|integer|min:0',
@@ -121,10 +121,10 @@ class ActivityController extends Controller
             'preference_types.*' => [
                                     Rule::in(Activity::availablePreferenceTypes()),],
             'transport_mode'     => ['sometimes','required_if:type,Transport','prohibited_unless:type,Transport',
-                                    'in:airplane,train,car,bus,ferry,cruise ship','required_if:type,Transport'],
+                                    Rule::in(['airplane','train','car','bus','ferry','cruise ship'])],
             'accommodation_class'=> ['sometimes','required_if:type,Accommodation','prohibited_unless:type,Accommodation',
-                                    'in:hostel,guesthouse,budget_hotel,standard_hotel,boutique_hotel,luxury_hotel,
-                                    resort,apartment,bed_and_breakfast,villa,mountain_lodge,camping,glamping','required_if:type,Accommodation'],
+                                    Rule::in(['hostel','guesthouse','budget_hotel','standard_hotel','boutique_hotel','luxury_hotel',
+                                    'resort','apartment','bed_and_breakfast','villa','mountain_lodge','camping','glamping'])],
         ]);
 
         $activity->update($data);
