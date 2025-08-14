@@ -18,10 +18,10 @@ class PlanItemController extends Controller
     // vraća sve stavke za dati plan
     public function index(TravelPlan $travelPlan, Request $request) //radimo  u okviru tacno odredjenog travel plana
     {
+        $this->authorize('viewAny', [PlanItem::class, $travelPlan]);  //proverava da li korisnik ima pravo da vidi ovaj plan
+        
         $q = $travelPlan->planItems()->with('activity');  //vuce i relaciju activity
 
-        $this->authorize('view', $travelPlan);  //proverava da li korisnik ima pravo da vidi ovaj plan
-        
         // Filter by activity type
         if ($type = $request->query('type')) {
             $q->whereHas('activity', fn($a) => $a->where('type', $type));
@@ -48,6 +48,7 @@ class PlanItemController extends Controller
     // validira activity_id i time_from, računa time_to, amount i name pa kreira novu stavku
     public function store(Request $request, TravelPlan $travelPlan)
     {
+        $this->authorize('create', [PlanItem::class, $travelPlan]);
         // 1) Osnovna validacija unosa
         $data = $request->validate([
             'activity_id' => 'required|exists:activities,id',
@@ -156,6 +157,8 @@ class PlanItemController extends Controller
             abort(Response::HTTP_NOT_FOUND);
         }
 
+        $this->authorize('update', $planItem); // Proverava da li korisnik ima pravo da ažurira ovu stavku
+
         $data = $request->validate([
             'time_from' => ['sometimes', 'required', 'date', 'after_or_equal:' . $travelPlan->start_date],
         ]);
@@ -212,8 +215,11 @@ class PlanItemController extends Controller
             abort(Response::HTTP_NOT_FOUND);
         }
 
+        $this->authorize('delete', $planItem); // Proverava da li korisnik ima pravo da obriše ovu stavku
+        
         $travelPlan->decrement('total_cost', $planItem->amount);
         $travelPlan->refresh();
+
         if ($travelPlan->total_cost < 0) { //u slucaju da se stavka obrise vise puta
             $travelPlan->update(['total_cost' => 0]);
         }

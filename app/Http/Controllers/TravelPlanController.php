@@ -26,17 +26,21 @@ class TravelPlanController extends Controller
      */
     public function index(Request $request)
     {
+        $this->authorize('viewAny', TravelPlan::class);
+
+        $me = $request->user();
+        
         $q = TravelPlan::with(['planItems' => function($q) {
             $q->orderBy('time_from');
         }, 'planItems.activity','user']);
 
         // Filter by user_id, if not admin
-        $user=$request->user();
-        if (!$user->is_admin) {
-            $q->where('user_id', $user->id);
-        } elseif ($uid = $request->integer('user_id')) {
-            $q->where('user_id', $uid);
+       if ($me->is_admin) {
+            $q->where('user_id', '!=', $me->id);   // admin vidi sve TUĐE
+        } else {
+            $q->where('user_id', $me->id);         // user vidi SVOJE
         }
+
 
         // Filter by destination
         if ($dest = $request->query('destination')) {
@@ -66,8 +70,10 @@ class TravelPlanController extends Controller
      */
     public function store(Request $request)
     {
+        $this->authorize('create', TravelPlan::class);
+
+
         $data = $request->validate([
-           // 'user_id'         => 'required|integer|exists:users,id', //menjati kada se koristi auth()->user()->id
             'start_location'  => 'required|string',
             'destination'     => ['required', 'string',
                                  Rule::in(Activity::query()->distinct()->pluck('location')->toArray()), ], //PHP niz od jedinstvenih vrednosti iz kolone location iz activities tabele
@@ -84,7 +90,8 @@ class TravelPlanController extends Controller
                                     'resort','apartment','bed_and_breakfast','villa','mountain_lodge','camping','glamping'])],
         ]);
 
-        $user_id = auth()->id();
+        $data['user_id'] = $request->user()->id;
+        
         $plan = $storeService->createWithGeneratedItems($data);
         return new TravelPlanResource($plan);
 
@@ -195,6 +202,16 @@ class TravelPlanController extends Controller
 
     public function search(Request $request): JsonResponse 
     {
+        $this->authorize('search', TravelPlan::class);
+
+        $me = $request->user();
+
+        if ($me->is_admin) {
+            $q->where('user_id', '!=', $me->id);
+        } else {
+            $q->where('user_id', $me->id);
+        }
+
         // Validacija ulaznih parametara
         $data = $request->validate([
             'user_id'        => ['sometimes','integer','exists:users,id'], 
@@ -216,10 +233,6 @@ class TravelPlanController extends Controller
        //plan sa stavkama, sortiran po vremenu
         $q = TravelPlan::with(['planItems' => function($q) { $q->orderBy('time_from');}, 
                             'planItems.activity','user'])->where('user_id', $request->user()->id);
-
-        if (!empty($data['user_id'])) {
-            $q->where('user_id', $data['user_id']);
-        } //samo za admin pretragu
 
         if (!empty($data['destination'])) {
             $q->where('destination', $data['destination']);
@@ -262,7 +275,7 @@ class TravelPlanController extends Controller
 
     public function exportPdf(Request $request, TravelPlan $travelPlan)
     {
-        $this->authorize('view', $travelPlan);   
+        $this->authorize('export', $travelPlan);   
 
         $travelPlan->load(['user','planItems.activity']);
 
