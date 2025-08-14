@@ -20,8 +20,11 @@ class TravelPlanFactory extends Factory
 
     public function definition(): array
     {
-        $user = User::inRandomOrder()->first() ?? User::factory()->create();
-        $locations = Activity::query()->distinct()->pluck('location')->toArray();
+        //$user = User::inRandomOrder()->first() ?? User::factory()->create();
+        $user = User::where('is_admin', false)->inRandomOrder()->first()
+                            ?? User::factory()->create(['is_admin' => false]);  //admin users are not allowed to create travel plans
+        
+                            $locations = Activity::query()->distinct()->pluck('location')->toArray();
         if (empty($locations)) {
             $locations = ['Prague'];
         }

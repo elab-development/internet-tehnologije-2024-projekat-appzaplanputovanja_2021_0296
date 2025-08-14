@@ -15,7 +15,9 @@ class TravelPlanSeeder extends Seeder
 {
     public function run(): void
     {
-        $users = User::all();
+       // $users = User::all();
+       $users = User::where('is_admin', false)->get(); // samo obični korisnici mogu kreirati planove putovanja
+
         if ($users->isEmpty()) {
             $users = User::factory()->count(2)->create();
         }
