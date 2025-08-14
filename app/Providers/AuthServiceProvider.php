@@ -4,11 +4,13 @@ namespace App\Providers;
 
 use Illuminate\Foundation\Support\Providers\AuthServiceProvider as ServiceProvider;
 use Illuminate\Support\Facades\Gate;
+use App\Models\TravelPlan;
+use App\Policies\TravelPlanPolicy;
 
 class AuthServiceProvider extends ServiceProvider
 {
     protected $policies = [
-        // 'App\Models\Model' => 'App\Policies\ModelPolicy',
+        TravelPlan::class => TravelPlanPolicy::class,
     ];
 
     public function boot(): void

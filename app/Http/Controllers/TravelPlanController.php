@@ -30,9 +30,12 @@ class TravelPlanController extends Controller
             $q->orderBy('time_from');
         }, 'planItems.activity','user']);
 
-        // Filter by user_id
-        if ($userId = $request->integer('user_id')) {
-            $q->where('user_id', $userId);
+        // Filter by user_id, if not admin
+        $user=$request->user();
+        if (!$user->is_admin) {
+            $q->where('user_id', $user->id);
+        } elseif ($uid = $request->integer('user_id')) {
+            $q->where('user_id', $uid);
         }
 
         // Filter by destination
@@ -64,7 +67,7 @@ class TravelPlanController extends Controller
     public function store(Request $request)
     {
         $data = $request->validate([
-            'user_id'         => 'required|integer|exists:users,id', //menjati kada se koristi auth()->user()->id
+           // 'user_id'         => 'required|integer|exists:users,id', //menjati kada se koristi auth()->user()->id
             'start_location'  => 'required|string',
             'destination'     => ['required', 'string',
                                  Rule::in(Activity::query()->distinct()->pluck('location')->toArray()), ], //PHP niz od jedinstvenih vrednosti iz kolone location iz activities tabele
@@ -81,6 +84,7 @@ class TravelPlanController extends Controller
                                     'resort','apartment','bed_and_breakfast','villa','mountain_lodge','camping','glamping'])],
         ]);
 
+        $user_id = auth()->id();
         $plan = $storeService->createWithGeneratedItems($data);
         return new TravelPlanResource($plan);
 
@@ -91,6 +95,7 @@ class TravelPlanController extends Controller
      */
     public function show(TravelPlan $travelPlan)
     {
+        $this->authorize('view', $travelPlan);   
         return new TravelPlanResource($travelPlan->load(['planItems.activity','user']));
         //return response()->json($travelPlan->load('planItems')); // Return a single travel plan with its items
     }
@@ -100,6 +105,8 @@ class TravelPlanController extends Controller
      */
     public function update(Request $request, TravelPlan $travelPlan, TravelPlanUpdateService $svc)
     {
+        $this->authorize('update', $travelPlan);
+
         return DB::transaction(function () use ($request, $travelPlan, $svc) {
 
             //Zaključaj plan u transakciji
@@ -174,35 +181,49 @@ class TravelPlanController extends Controller
             return new TravelPlanResource($travelPlan->fresh(['planItems.activity']));
         });
     }
-/**public function search(Request $request): JsonResponse //kada zavrsimo autentifikaciju
+     /**
+     * Remove the specified resource from storage.
+     */
+    public function destroy(TravelPlan $travelPlan)
+    {
+        $this->authorize('delete', $travelPlan);   
+        $travelPlan->delete();
+
+        return response()->noContent();
+        //return response()->json(['data'    => null,'message' => 'Travel plan deleted successfully.'], 200);
+    }
+
+    public function search(Request $request): JsonResponse 
     {
         // Validacija ulaznih parametara
         $data = $request->validate([
-            'user_id'        => ['sometimes','integer','exists:users,id'], //kada zavrsimo autentifikaciju
+            'user_id'        => ['sometimes','integer','exists:users,id'], 
             'destination'   => ['sometimes','string','max:255'],
             'q'             => ['sometimes','string','max:255'], // tekstualna pretraga
             'date_from'     => ['sometimes','date'],
             'date_to'       => ['sometimes','date','after_or_equal:date_from'],
-            'budget_min'    => ['sometimes','numeric','min:0'],
-            'budget_max'    => ['sometimes','numeric','gte:budget_min'],
-            'total_cost_max'=> ['sometimes','numeric','min:0'],
-            'passengers'    => ['sometimes','integer','min:1'],
+            //'budget_min'    => ['sometimes','numeric','min:0'],
+            //'budget_max'    => ['sometimes','numeric','gte:budget_min'],
+           // 'total_cost_max'=> ['sometimes','numeric','min:0'],
+           // 'passengers'    => ['sometimes','integer','min:1'],
             'preference'    => ['sometimes','array'],            // npr. preference[]=want_culture
             'preference.*'  => ['string','max:100'],
-            'sort_by'       => ['sometimes', Rule::in(['start_date','end_date','budget','total_cost','destination'])],
-            'sort_dir'      => ['sometimes', Rule::in(['asc','desc'])],
+            //'sort_by'       => ['sometimes', Rule::in(['start_date','end_date','budget','total_cost','destination'])],
+           // 'sort_dir'      => ['sometimes', Rule::in(['asc','desc'])],
             'per_page'      => ['sometimes','integer','min:1','max:100'],
         ]);
 
        //plan sa stavkama, sortiran po vremenu
-        $q = TravelPlan::with(['planItems' => function($q) {
-            $q->orderBy('time_from');
-        }, 'planItems.activity','user']);
+        $q = TravelPlan::with(['planItems' => function($q) { $q->orderBy('time_from');}, 
+                            'planItems.activity','user'])->where('user_id', $request->user()->id);
 
         if (!empty($data['user_id'])) {
             $q->where('user_id', $data['user_id']);
-        }
+        } //samo za admin pretragu
 
+        if (!empty($data['destination'])) {
+            $q->where('destination', $data['destination']);
+        }
         // preklapanje sa [date_from, date_to]
         $from = $data['date_from'] ?? null;
         $to   = $data['date_to']   ?? null;
@@ -235,12 +256,14 @@ class TravelPlanController extends Controller
         //  Paginacija
         $perPage = $data['per_page'] ?? 10;
 
-        return TravelPlanResource::collection($q->paginate($perPage)->appends($request->query()));
+        return TravelPlanResource::collection($q->paginate($perPage)->appends($request->query()))->response();
        // return response()->json($q->paginate($perPage)->appends($request->query()));
     }
-*/
+
     public function exportPdf(Request $request, TravelPlan $travelPlan)
     {
+        $this->authorize('view', $travelPlan);   
+
         $travelPlan->load(['user','planItems.activity']);
 
         // sortiraj stavke po vremenu
