@@ -14,6 +14,12 @@ class UserSeeder extends Seeder
 
         //3 poznata naloga
         User::factory()->create([
+            'name' => 'Admin',
+            'email' => 'admin@example.com',
+            'password' => 'admin123', // biće hešovano
+            'is_admin' => true,
+        ]);
+        User::factory()->create([
             'name' => 'Masa',
             'email' => 'masaljekocevic@gmail.com',
             'password' => 'masa123',

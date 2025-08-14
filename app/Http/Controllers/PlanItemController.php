@@ -20,6 +20,8 @@ class PlanItemController extends Controller
     {
         $q = $travelPlan->planItems()->with('activity');  //vuce i relaciju activity
 
+        $this->authorize('view', $travelPlan);  //proverava da li korisnik ima pravo da vidi ovaj plan
+        
         // Filter by activity type
         if ($type = $request->query('type')) {
             $q->whereHas('activity', fn($a) => $a->where('type', $type));
