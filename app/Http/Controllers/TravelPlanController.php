@@ -68,7 +68,7 @@ class TravelPlanController extends Controller
     /**
      * Store a newly created resource in storage.
      */
-    public function store(Request $request)
+    public function store(Request $request, TravelPlanStoreService $storeService)
     {
         $this->authorize('create', TravelPlan::class);
 
@@ -200,9 +200,13 @@ class TravelPlanController extends Controller
         //return response()->json(['data'    => null,'message' => 'Travel plan deleted successfully.'], 200);
     }
 
-    public function search(Request $request): JsonResponse 
+    public function search(Request $request) //: JsonResponse 
     {
         $this->authorize('search', TravelPlan::class);
+
+        //plan sa stavkama, sortiran po vremenu
+        $q = TravelPlan::with(['planItems' => function($q) { $q->orderBy('time_from');}, 
+                            'planItems.activity','user'])->where('user_id', $request->user()->id);
 
         $me = $request->user();
 
@@ -229,10 +233,6 @@ class TravelPlanController extends Controller
            // 'sort_dir'      => ['sometimes', Rule::in(['asc','desc'])],
             'per_page'      => ['sometimes','integer','min:1','max:100'],
         ]);
-
-       //plan sa stavkama, sortiran po vremenu
-        $q = TravelPlan::with(['planItems' => function($q) { $q->orderBy('time_from');}, 
-                            'planItems.activity','user'])->where('user_id', $request->user()->id);
 
         if (!empty($data['destination'])) {
             $q->where('destination', $data['destination']);
@@ -283,7 +283,7 @@ class TravelPlanController extends Controller
         $items = $travelPlan->planItems->sortBy('time_from');
 
 
-        //  agregarane stavke
+        //  agregirane stavke
         $totals = [
             'count'        => $items->count(),
             'duration_min' => $items->sum(function ($i) {

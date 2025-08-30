@@ -282,7 +282,7 @@ class TravelPlanStoreService
         $item = PlanItem::create([
             'travel_plan_id' => $plan->id,
             'activity_id'    => $activity->id,
-            'name'           => $activity,
+            'name'           => $activity->name,
             'time_from'      => $timeFrom,
             'time_to'        => $timeTo,
             'amount'         => $amount,
