@@ -17,7 +17,7 @@ class ActivityResource extends JsonResource
        return [
             'id'                  => $this->id,
             'type'                => $this->type,        // enum
-            'name'                => $this->name,
+            //'name'                => $this->name,
             'price'               => (float) $this->price,
             'duration'            => (int) $this->duration, // minuti
             'location'            => $this->location,
@@ -25,8 +25,6 @@ class ActivityResource extends JsonResource
             //mergeWhen-dodaje vise polja odjednom ako je uslov ispunjen
             $this->mergeWhen(!is_null($this->content), ['content' => $this->content,]),
             $this->mergeWhen(!empty($this->preference_types), ['preference_types' => $this->preference_types,]),
-
-            'image_url'           => $this->image_url,
             
             // Dodajemo transport_mode i accommodation_class samo ako su relevantni
             'transport_mode' => $this->when(

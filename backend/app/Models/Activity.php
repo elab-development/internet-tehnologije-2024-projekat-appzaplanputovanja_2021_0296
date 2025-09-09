@@ -19,7 +19,6 @@ class Activity extends Model
         'preference_types', 
         'transport_mode',
         'accommodation_class',
-        'image_url'
     ];
 
     // Define the relationship with PlanItem model

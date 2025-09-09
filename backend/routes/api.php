@@ -15,10 +15,6 @@ use App\Http\Controllers\{AuthController, TravelPlanController, ActivityControll
 |
 */
 
-// PUBLIC (svi)
-Route::apiResource('activities', ActivityController::class)
-    ->only(['index','show']);
-
 // PUBLIC (auth)
 Route::prefix('auth')->group(function () {
     Route::post('register', [AuthController::class, 'register'])->name('auth.register');
@@ -47,9 +43,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
 // ADMIN-ONLY
 Route::middleware(['auth:sanctum','admin'])->group(function () {
-    //Route::apiResource('activities', ActivityController::class);   // CRUD nad aktivnostima samo admin
-    Route::apiResource('activities', ActivityController::class)->except(['index','show']);
-
+    Route::apiResource('activities', ActivityController::class);   // CRUD nad aktivnostima samo admin
     Route::apiResource('users', UserController::class)->only(['index','show','destroy']); // pregled/brisanje korisnika
     Route::get('settings',        [SettingController::class, 'index']);
     Route::get('settings/{key}',  [SettingController::class, 'show']);

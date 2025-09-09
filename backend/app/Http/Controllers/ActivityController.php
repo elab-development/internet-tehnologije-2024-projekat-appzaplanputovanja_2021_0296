@@ -81,7 +81,6 @@ class ActivityController extends Controller
             // Za validaciju svakog elementa preference_types niza:
             'preference_types.*' => [   
                                     Rule::in(Activity::availablePreferenceTypes()), ],
-            'image_url'          => 'nullable|url|max:2048',
             'transport_mode'     => ['required_if:type,Transport','prohibited_unless:type,Transport',
                                      Rule::in(['airplane','train','car','bus','ferry','cruise ship'])],
             'accommodation_class'=> ['required_if:type,Accommodation','prohibited_unless:type,Accommodation',
@@ -118,15 +117,14 @@ class ActivityController extends Controller
             'price'              => 'sometimes|required|numeric|min:0',
             'duration'           => 'sometimes|required|integer|min:0',
             'content'            => 'sometimes|nullable|string',
-            'image_url'          => 'sometimes|nullable|url|max:2048',
             'preference_types'   => 'sometimes|required|array',
             'preference_types.*' => [
                                     Rule::in(Activity::availablePreferenceTypes()),],
-            [
+            ],[
             'type.prohibited'                => 'Type cannot be changed after creation.',
             'location.prohibited'            => 'Location cannot be changed after creation.',
             'transport_mode.prohibited'      => 'Transport mode cannot be changed after creation.',
-            'accommodation_class.prohibited' => 'Accommodation class cannot be changed after creation.',]
+            'accommodation_class.prohibited' => 'Accommodation class cannot be changed after creation.',
         ]);
 
         //$activity->update($data);
