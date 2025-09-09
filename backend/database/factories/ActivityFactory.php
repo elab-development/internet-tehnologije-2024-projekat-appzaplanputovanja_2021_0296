@@ -30,6 +30,19 @@ class ActivityFactory extends Factory
         shuffle($prefsAll);
         $prefs = array_slice($prefsAll, 0, $this->faker->numberBetween(1, min(4, count($prefsAll))));
 
+        $imgByType = [
+        'Culture&Sightseeing'      => 'https://images.unsplash.com/photo-1505761671935-60b3a7427bad',
+        'Shopping&Souvenirs'       => 'https://images.unsplash.com/photo-1521335629791-ce4aec67dd53',
+        'Relaxation&Wellness'      => 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e',
+        'Educational&Volunteering' => 'https://images.unsplash.com/photo-1513258496099-48168024aec0',
+        'Nature&Adventure'         => 'https://images.unsplash.com/photo-1501785888041-af3ef285b470',
+        'Food&Drink'               => 'https://images.unsplash.com/photo-1478145046317-39f10e56b5e9',
+        'Entertainment&Leisure'    => 'https://images.unsplash.com/photo-1504384308090-c894fdcc538d',
+        'Family-Friendly'          => 'https://images.unsplash.com/photo-1519681393784-d120267933ba',
+        'Accommodation'            => 'https://images.unsplash.com/photo-1560066984-138dadb4c035',
+        'Transport'                => 'https://images.unsplash.com/photo-1501706362039-c06b2d715385',
+        'other'                    => 'https://images.unsplash.com/photo-1500530855697-b586d89ba3ee',
+        ];
         $data = [
             'type'             => $type,
             'name'             => $this->faker->words(3, true),
@@ -38,6 +51,7 @@ class ActivityFactory extends Factory
             'location'         => $this->faker->randomElement(['Prague','Vienna','Budapest','Belgrade','Zagreb']),
             'content'          => $this->faker->optional()->sentence(12),
             'preference_types' => $prefs,
+            'image_url'        => $imgByType[$type] ?? $imgByType['other'],
         ];
 
         if ($type === 'Transport') {
