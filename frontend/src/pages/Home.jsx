@@ -1,13 +1,23 @@
 import React from "react";
 import NavBar from "../components/NavBar";
 import DestinationsFeed from "../components/DestinationsFeed";
+import { useNavigate } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
 
 export default function Home() {
-  const handleLoginClick = React.useCallback(() => {
-    // Privremeno: samo navigacioni hook za kasnije (login stranicu ćemo dodati u sledećem koraku)
-    // window.location.href = "/login"; // ili koristimo react-router kasnije
-    alert("Ovde će ići navigacija ka /login – dodaćemo u sledećem koraku.");
-  }, []);
+  //const handleLoginClick = React.useCallback(() => {
+  // Privremeno: samo navigacioni hook za kasnije (login stranicu ćemo dodati u sledećem koraku)
+  // window.location.href = "/login"; // ili koristimo react-router kasnije
+  //   alert("Ovde će ići navigacija ka /login – dodaćemo u sledećem koraku.");
+  // }, []);
+
+  const navigate = useNavigate();
+  const { isAuth } = useAuth();
+
+  const handleLoginClick = () => {
+    if (isAuth) navigate("/dashboard");
+    else navigate("/login");
+  };
 
   const handleDestinationsClick = React.useCallback(() => {
     // Scroll na feed

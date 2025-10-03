@@ -59,3 +59,22 @@
   justify-content: space-between;
   align-items: center;
 }
+
+/* ===== AUTH ===== */
+.auth-wrap {
+  max-width: 480px;
+  margin: 0 auto;
+}
+.auth-card {
+  border-radius: 0.75rem;
+}
+.auth-card .form-label {
+  font-weight: 500;
+}
+
+/* Navbar hover already defined… */
+
+/* Buttons tweaks if needed */
+.btn-primary {
+  font-weight: 600;
+}

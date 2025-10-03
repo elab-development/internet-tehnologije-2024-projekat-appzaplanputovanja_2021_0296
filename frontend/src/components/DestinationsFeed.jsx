@@ -20,6 +20,7 @@ export default function DestinationsFeed({
 
       while (keepGoing && page <= 5) {
         const { data } = await api.get(`/activities?page=${page}`);
+        console.log("Activities response:", data);
         const items = data?.data ?? [];
         items.forEach((a) => {
           const key = a.location || "Unknown";
