@@ -1,4 +1,6 @@
 import React from "react";
+import { useNavigate } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
 
 function ActivityCard({ activity }) {
   const img =
@@ -11,7 +13,7 @@ function ActivityCard({ activity }) {
         src={img}
         alt={activity.name}
         className="card-img-top"
-        style={{ objectFit: "cover", height: 140 }} //  inline stil
+        style={{ objectFit: "cover", height: 140 }} // inline stil
       />
       <div className="card-body d-flex flex-column">
         <div className="d-flex justify-content-between align-items-start mb-1">
@@ -28,15 +30,29 @@ function ActivityCard({ activity }) {
   );
 }
 
-export default function DestinationCard({ name, activities = [], onOpen }) {
+export default function DestinationCard({ name, activities = [] }) {
+  const navigate = useNavigate();
+  const { isAuth } = useAuth();
+
+  const handleCreatePlan = () => {
+    if (isAuth) {
+      navigate("/create-plan"); // kasnije napraviš tu stranicu
+    } else {
+      navigate("/login");
+    }
+  };
+
   return (
     <div className="col-12">
       <div className="card mb-4 shadow-sm border-0">
         <div className="card-body">
           <div className="d-flex justify-content-between align-items-center mb-3">
             <h5 className="card-title mb-0">{name}</h5>
-            <button className="btn btn-outline-primary" onClick={onOpen}>
-              Open destination
+            <button
+              className="btn btn-outline-primary"
+              onClick={handleCreatePlan}
+            >
+              Create plan
             </button>
           </div>
 
