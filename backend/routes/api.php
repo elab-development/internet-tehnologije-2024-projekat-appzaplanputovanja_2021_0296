@@ -29,17 +29,20 @@ Route::prefix('auth')->group(function () {
 Route::middleware('auth:sanctum')->group(function () {
     Route::post('auth/logout', [AuthController::class, 'logout'])->name('auth.logout');
 
-    // Korisnik upravlja samo svojim TravelPlan-ovima; admin moze samo da pregleda tudje planove
-    Route::apiResource('travel-plans', TravelPlanController::class); // RESOURCE ruta za TravelPlans
-
-    // Korisnik samo lista stavke unutar svog konkretnog TravelPlan-a; admin lista stavke unutar tudjeg TravelPlan-a
-    Route::get('travel-plans/{travel_plan}/items',  [PlanItemController::class, 'index'])->name('travel-plans.items.index'); 
     
     // Pretraga sopstvenih planova
-    Route::get('travel-plans/search', [TravelPlanController::class, 'search']);
+    Route::get('travel-plans/search', [TravelPlanController::class, 'search'])->name('travel-plans.search');
+
+    // Korisnik samo lista stavke unutar svog konkretnog TravelPlan-a; admin lista stavke unutar tudjeg TravelPlan-a
+    Route::get('travel-plans/{travel_plan}/items', [PlanItemController::class, 'index'])
+    ->whereNumber('travel_plan') 
+    ->name('travel-plans.items.index');
 
     // Export PDF sopstvenog plana
     Route::get('travel-plans/{travel_plan}/export/pdf', [TravelPlanController::class, 'exportPdf'])->name('travel-plans.export.pdf');
+
+    // Korisnik upravlja samo svojim TravelPlan-ovima; admin moze samo da pregleda tudje planove
+    Route::apiResource('travel-plans', TravelPlanController::class); // RESOURCE ruta za TravelPlans 
 
     // Vidi samo svoje nadolazeće planove
     Route::get('users/{user}/travel-plans', [UserController::class, 'plans'])->name('users.travel-plans');

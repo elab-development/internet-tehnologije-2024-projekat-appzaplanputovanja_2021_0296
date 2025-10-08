@@ -1,46 +1,45 @@
-import React from "react";
-import { AuthApi, getToken, clearToken } from "../api/client";
+// src/context/AuthContext.jsx
+import React, { createContext, useContext, useEffect, useState } from "react";
+import { AuthApi, getToken } from "../api/client";
 
-const AuthContext = React.createContext(null);
+const AuthContext = createContext();
+export const useAuth = () => useContext(AuthContext);
 
 export function AuthProvider({ children }) {
-  const [user, setUser] = React.useState(null);
-  const [loading, setLoading] = React.useState(true);
+  const [isAuth, setIsAuth] = useState(false);
+  const [loading, setLoading] = useState(true);
 
-  // (opciono) ovde biste mogli da pogodite /api/user ako to backend podržava.
-  React.useEffect(() => {
-    const t = getToken();
-    if (!t) {
-      setLoading(false);
-      return;
-    }
-    // Minimalno: znamo da postoji token -> user je "pseudo-auth"
-    setUser({ email: "current" });
+  // 1) na startu aplikacije – učitaj token iz localStorage
+  useEffect(() => {
+    setIsAuth(!!getToken());
     setLoading(false);
   }, []);
 
-  const login = async (credentials) => {
-    const data = await AuthApi.login(credentials);
-    setUser(data?.user ?? { email: credentials.email });
-    return data;
+  // 2) login – AuthApi.login već setuje token; ovde ažuriramo state
+  const login = async (payload) => {
+    const res = await AuthApi.login(payload);
+    if (res?.user?.name) {
+      localStorage.setItem("tp_user_name", res.user.name);
+    }
+    setIsAuth(!!getToken());
   };
 
+  // 2b) register – AuthApi.register već setuje token; ovde ažuriramo state
   const register = async (payload) => {
-    const data = await AuthApi.register(payload);
-    setUser(data?.user ?? { email: payload.email });
-    return data;
+    const res = await AuthApi.register(payload);
+    if (res?.user?.name) localStorage.setItem("tp_user_name", res.user.name);
+    setIsAuth(!!getToken());
   };
-
+  
+  // 3) logout – AuthApi.logout briše token; ovde čistimo state
   const logout = async () => {
     await AuthApi.logout();
-    clearToken();
-    setUser(null);
+    setIsAuth(false);
   };
 
-  const value = { user, loading, login, register, logout, isAuth: !!user };
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
-}
-
-export function useAuth() {
-  return React.useContext(AuthContext);
+  return (
+    <AuthContext.Provider value={{ isAuth, loading, login, register, logout }}>
+      {children}
+    </AuthContext.Provider>
+  );
 }

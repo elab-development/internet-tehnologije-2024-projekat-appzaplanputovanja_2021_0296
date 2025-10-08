@@ -28,7 +28,11 @@ export default function Register() {
       await register(form);
       nav("/dashboard", { replace: true });
     } catch (err) {
-      setError(err?.response?.data?.message || "Registration failed.");
+      const api = err?.response?.data;
+      const firstError = api?.errors
+        ? Object.values(api.errors).flat()[0]
+        : api?.message;
+      setError(firstError || "Registration failed.");
     } finally {
       setBusy(false);
     }

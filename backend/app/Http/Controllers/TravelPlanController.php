@@ -200,78 +200,59 @@ class TravelPlanController extends Controller
         //return response()->json(['data'    => null,'message' => 'Travel plan deleted successfully.'], 200);
     }
 
-    public function search(Request $request) //: JsonResponse 
+    
+    public function search(Request $request)
     {
         $this->authorize('search', TravelPlan::class);
 
-        //plan sa stavkama, sortiran po vremenu
-        $q = TravelPlan::with(['planItems' => function($q) { $q->orderBy('time_from');}, 
-                            'planItems.activity','user'])->where('user_id', $request->user()->id);
-
         $me = $request->user();
 
-        if ($me->is_admin) {
-            $q->where('user_id', '!=', $me->id);
-        } else {
-            $q->where('user_id', $me->id);
-        }
-
-        // Validacija ulaznih parametara
+        // 1) VALIDACIJA
         $data = $request->validate([
-            'user_id'        => ['sometimes','integer','exists:users,id'], 
-            'destination'   => ['sometimes','string','max:255'],
-            'q'             => ['sometimes','string','max:255'], // tekstualna pretraga
-            'date_from'     => ['sometimes','date'],
-            'date_to'       => ['sometimes','date','after_or_equal:date_from'],
-            //'budget_min'    => ['sometimes','numeric','min:0'],
-            //'budget_max'    => ['sometimes','numeric','gte:budget_min'],
-           // 'total_cost_max'=> ['sometimes','numeric','min:0'],
-           // 'passengers'    => ['sometimes','integer','min:1'],
-            'preference'    => ['sometimes','array'],            // npr. preference[]=want_culture
-            'preference.*'  => ['string','max:100'],
-            //'sort_by'       => ['sometimes', Rule::in(['start_date','end_date','budget','total_cost','destination'])],
-           // 'sort_dir'      => ['sometimes', Rule::in(['asc','desc'])],
-            'per_page'      => ['sometimes','integer','min:1','max:100'],
+            'q'         => ['sometimes','string','max:255'],
+            'date_from' => ['sometimes','date'],
+            'date_to'   => ['sometimes','date','after_or_equal:date_from'],
+            'per_page'  => ['sometimes','integer','min:1','max:100'],
         ]);
 
-        if (!empty($data['destination'])) {
-            $q->where('destination', $data['destination']);
+        // 2) BAZNI UPIT – SAMO SVOJI PLANOVI (admin vidi tuđe, korisnik svoje)
+        $q = TravelPlan::with(['planItems'=>fn($qq)=>$qq->orderBy('time_from'),'planItems.activity','user']);
+
+        if ($me->is_admin) {
+            $q->where('user_id','!=',$me->id);
+        } else {
+            $q->where('user_id',$me->id);
         }
-        // preklapanje sa [date_from, date_to]
+
+        // 3) FILTER: destinacija (tekstualna pretraga po destination)
+        $destExists = null;
+        if (!empty($data['q'])) {
+            $term = trim($data['q']);
+            $q->where('destination','LIKE',"%{$term}%");
+
+            // signalizuj da li takva lokacija uopšte postoji u Activities
+            $destExists = Activity::where('location','LIKE',"%{$term}%")->exists();
+        }
+
+        // 4) FILTER: interval (overlap logika)
         $from = $data['date_from'] ?? null;
         $to   = $data['date_to']   ?? null;
         if ($from || $to) {
-            $q->where(function ($qq) use ($from, $to) {
-                if ($from) $qq->where('end_date', '>=', $from);
-                if ($to)   $qq->where('start_date', '<=', $to);
+            $q->where(function ($qq) use ($from,$to) {
+                if ($from) $qq->where('end_date','>=',$from);
+                if ($to)   $qq->where('start_date','<=',$to);
             });
         }
 
-        // Višestruke preferencije
-        if (!empty($data['preference'])) {
-            $prefs = (array) $data['preference'];
-            $q->where(function ($qq) use ($prefs) {
-                foreach ($prefs as $p) {
-                    $qq->orWhereJsonContains('preferences', $p);
-                }
-            });
-        }
-
-        //Tekstualna pretraga po polju start_location/destination
-        if (!empty($data['q'])) {
-            $term = trim($data['q']);
-            $q->where(function ($qq) use ($term) {
-                $qq->where('start_location', 'LIKE', "%{$term}%")
-                ->orWhere('destination', 'LIKE', "%{$term}%");
-            });
-        }
-
-        //  Paginacija
+        // 5) PAGINACIJA + META (destination_exists)
         $perPage = $data['per_page'] ?? 10;
+        $paginator = $q->paginate($perPage)->appends($request->query());
 
-        return TravelPlanResource::collection($q->paginate($perPage)->appends($request->query()))->response();
-       // return response()->json($q->paginate($perPage)->appends($request->query()));
+        return TravelPlanResource::collection($paginator)
+            ->additional(['meta'=>['destination_exists'=>$destExists]])    //ako postoji q, vrati i destination_exists
+            ->response();
     }
+
 
     public function exportPdf(Request $request, TravelPlan $travelPlan)
     {
