@@ -5,11 +5,9 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 
 export default function Home() {
-  //const handleLoginClick = React.useCallback(() => {
-  // Privremeno: samo navigacioni hook za kasnije (login stranicu ćemo dodati u sledećem koraku)
-  // window.location.href = "/login"; // ili koristimo react-router kasnije
-  //   alert("Ovde će ići navigacija ka /login – dodaćemo u sledećem koraku.");
-  // }, []);
+  const scrollToFeed = () => {
+    document.getElementById("feed")?.scrollIntoView({ behavior: "smooth" });
+  };
 
   const navigate = useNavigate();
   const { isAuth } = useAuth();
@@ -32,26 +30,17 @@ export default function Home() {
 
   return (
     <>
-      <NavBar
-        onLoginClick={handleLoginClick}
-        onDestinationsClick={handleDestinationsClick}
-      />
-
+      <NavBar onDestinationsClick={scrollToFeed} />
       <header className="hero py-5">
         <div className="container">
-          <h1 className="hero-title display-6 mb-2">Welcome!</h1>
           <p className="hero-subtitle lead mb-0">
-            Explore destinations and activities. Sign in to create your
-            personalized trip plan within budget.
+            Explore destinations and activities. Plan your perfect trip!
           </p>
         </div>
       </header>
-
       <main className="container py-4" id="feed">
-        <h2 className="h4 mb-3">Destinations</h2>
         <DestinationsFeed onOpenDestination={handleOpenDestination} />
       </main>
-
       <footer className="app-footer text-center small">
         © {new Date().getFullYear()} Travel Planner
       </footer>

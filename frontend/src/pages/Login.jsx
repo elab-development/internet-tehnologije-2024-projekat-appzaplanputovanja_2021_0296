@@ -1,13 +1,15 @@
 import React from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import { useEffect } from "react";
 import AuthCard from "../components/AuthCard";
 import FormInput from "../components/ui/FormInput";
 import PrimaryButton from "../components/ui/PrimaryButton";
 
 export default function Login() {
   const nav = useNavigate();
-  const { login } = useAuth();
+  const location = useLocation();
+  const { login, isAuth } = useAuth();
   const [form, setForm] = React.useState({ email: "", password: "" });
   const [busy, setBusy] = React.useState(false);
   const [error, setError] = React.useState("");
@@ -20,8 +22,9 @@ export default function Login() {
     setBusy(true);
     setError("");
     try {
+      const from = location.state?.from?.pathname || "/dashboard";
       await login(form);
-      nav("/dashboard", { replace: true });
+      nav(from, { replace: true });
     } catch (err) {
       setError(
         err?.response?.data?.message ||
@@ -31,6 +34,10 @@ export default function Login() {
       setBusy(false);
     }
   };
+
+  useEffect(() => {
+    if (isAuth) nav("/dashboard", { replace: true });
+  }, [isAuth, nav]);
 
   return (
     <div className="container py-5">

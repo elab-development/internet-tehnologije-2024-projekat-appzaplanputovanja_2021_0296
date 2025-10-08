@@ -19,12 +19,19 @@ export function getToken() {
   return localStorage.getItem("tp_token");
 }
 export function setToken(token) {
-  if (token) localStorage.setItem("tp_token", token);
+  if (token) {
+    localStorage.setItem("tp_token", token);
+    api.defaults.headers.Authorization = `Bearer ${token}`;
+  }
 }
 export function clearToken() {
   localStorage.removeItem("tp_token");
+  delete api.defaults.headers.Authorization;
 }
-
+const existing = localStorage.getItem("tp_token");
+if (existing) {
+  api.defaults.headers.Authorization = `Bearer ${existing}`;
+}
 // ================= Interceptor =================
 // Dodaj Authorization header ako postoji token
 api.interceptors.request.use((config) => {
