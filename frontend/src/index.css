@@ -118,3 +118,55 @@ body {
   border-radius: 14px;
   border: 1px solid #eaeaea;
 }
+/* src/index.css – fragmenti za Create plan formu i par layout pomoćnika */
+.create-plan .tp-form {
+  max-width: 980px;
+}
+
+.app-footer {
+  padding: 1.25rem 0;
+  border-top: 1px solid rgba(0, 0, 0, 0.06);
+  color: #6c757d;
+}
+
+.loading-box {
+  padding: 3rem 0;
+  text-align: center;
+}
+
+.plans-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 12px;
+}
+
+.tp-card {
+  cursor: pointer;
+}
+
+.plan-item-card {
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.plan-item-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+.plan-item-img {
+  height: 120px;
+  object-fit: cover;
+  border-top-left-radius: 0.5rem;
+  border-top-right-radius: 0.5rem;
+}
+
+/* === Edit Travel Plan page === */
+.edit-plan-container .card {
+  border: 1px solid #e9ecef;
+}
+
+.edit-plan-container .card-header h5 {
+  font-weight: 600;
+}
+
+.edit-plan-container .form-label {
+  font-weight: 500;
+}

@@ -4,6 +4,7 @@ namespace App\Policies;
 
 use App\Models\PlanItem;
 use App\Models\User;
+use App\Models\TravelPlan;
 use Illuminate\Auth\Access\Response;
 
 class PlanItemPolicy // Omogućava da korisnik pristupa samo pregledu svojih stavki planova, dok admin pristupa tuđim stavkama

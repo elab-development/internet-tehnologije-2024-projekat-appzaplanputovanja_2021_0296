@@ -22,7 +22,12 @@ export default function NavBar({ variant = "auto", onDestinationsClick }) {
   // Automatska varijanta po ruti (ako nije eksplicitno prosleđena)
   let mode = variant;
   if (variant === "auto") {
-    if (loggedIn && pathname.startsWith("/dashboard")) mode = "dashboard";
+    // ako je korisnik na /dashboard/create
+    const isCreatePage = loggedIn && pathname.startsWith("/dashboard/create");
+    if (isCreatePage) {
+      mode = "dashboard-simple"; // poseban mod za kreiranje plana
+    } else if (loggedIn && pathname.startsWith("/dashboard"))
+      mode = "dashboard";
     else if (loggedIn) mode = "home";
     else mode = "guest";
   }
@@ -109,7 +114,7 @@ export default function NavBar({ variant = "auto", onDestinationsClick }) {
             </Link>
           )}
 
-          {mode === "home" && (
+          {(mode === "home" || mode === "dashboard-simple") && (
             <div className="d-flex align-items-center gap-2">
               <Link to="/dashboard" className="btn btn-outline-secondary">
                 My account
@@ -119,7 +124,6 @@ export default function NavBar({ variant = "auto", onDestinationsClick }) {
               </button>
             </div>
           )}
-
           {mode === "dashboard" && (
             <div className="d-flex align-items-center gap-2">
               <form

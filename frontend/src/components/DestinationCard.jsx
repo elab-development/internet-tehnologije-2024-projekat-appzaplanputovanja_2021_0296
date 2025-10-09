@@ -36,7 +36,7 @@ export default function DestinationCard({ name, activities = [] }) {
 
   const handleCreatePlan = () => {
     if (isAuth) {
-      navigate("/create-plan"); // kasnije napraviš tu stranicu
+      navigate("/dashboard/create");
     } else {
       navigate("/login");
     }
