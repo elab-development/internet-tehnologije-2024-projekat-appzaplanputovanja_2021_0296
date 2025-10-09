@@ -79,7 +79,7 @@ class TravelPlanController extends Controller
                                  Rule::in(Activity::query()->distinct()->pluck('location')->toArray()), ], //PHP niz od jedinstvenih vrednosti iz kolone location iz activities tabele
             'start_date'      => ['required', 'date', 'after:today'],
             'end_date'        => 'required|date|after_or_equal:start_date',
-            'budget'          => 'required|numeric|min:0',
+            'budget'          => 'required|numeric|min:1',
             'passenger_count' => 'required|integer|min:1',
             'preferences'     => 'required|array',
             'preferences.*'   => [
@@ -93,7 +93,9 @@ class TravelPlanController extends Controller
         $data['user_id'] = $request->user()->id;
         
         $plan = $storeService->createWithGeneratedItems($data);
-        return new TravelPlanResource($plan);
+        return (new TravelPlanResource($plan))->response()
+                                                ->setStatusCode(201)
+                                                ->header('Location', route('travel-plans.show', $plan->id));
 
     }
 
@@ -133,7 +135,7 @@ class TravelPlanController extends Controller
                 'start_date'      => ['sometimes','required','date','after:now'],
                 'end_date'        => ['sometimes','required','date','after_or_equal:start_date'],
                 'passenger_count' => ['sometimes','required','integer','min:1'],
-                'budget'          => ['sometimes','numeric','min:0', 
+                'budget'          => ['sometimes','numeric','min:1', 
                 // atribut-budget, nova vrednost atributa, fail callback-ako je greska
                                     function($attr,$value,$fail) use ($currentTotal){
                                         if ($value < $currentTotal) {

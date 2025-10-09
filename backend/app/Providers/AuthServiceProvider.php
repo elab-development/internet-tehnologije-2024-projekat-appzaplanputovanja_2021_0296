@@ -12,8 +12,8 @@ use App\Policies\PlanItemPolicy;
 class AuthServiceProvider extends ServiceProvider
 {
     protected $policies = [
-        TravelPlan::class => TravelPlanPolicy::class,
         PlanItem::class   => PlanItemPolicy::class,
+        TravelPlan::class => TravelPlanPolicy::class,
     ];
 
     public function boot(): void
