@@ -64,11 +64,11 @@ export default function EditTravelPlan() {
     };
   }, [id]);
 
-  const doUpdateWith = async (payload) => {
+  /*const doUpdateWith = async (payload) => {
     try {
       setSaving(true);
       setError("");
-      await api.put(`/travel-plans/${id}`, payload);
+      await api.patch(`/travel-plans/${id}`, payload);
       navigate(`/dashboard/plans/${id}`); //    vrati korisnika na prikaz plana
     } catch (err) {
       console.error(err);
@@ -95,33 +95,73 @@ export default function EditTravelPlan() {
       return "Budget must be greater than 0.";
     }
     return "";
+  };*/
+
+  const validateVals = (vals) => {
+    const { start_date, end_date, passenger_count, budget } = vals;
+    if (!start_date || !end_date)
+      return "Start date and end date are required.";
+    if (new Date(start_date) >= new Date(end_date))
+      return "End date must be after the start date.";
+    if (Number(passenger_count) <= 0)
+      return "Passenger count must be greater than 0.";
+    if (Number(budget) <= 0) return "Budget must be greater than 0.";
+    return "";
   };
 
-  //    Submit – ažuriranje plana i povratak na detalje
-  const onSubmit = async (e) => {
-    e.preventDefault();
-    const v = validate();
+  const toIso = (s) => {
+    if (!s) return s;
+    // već ISO?
+    if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+    // DD.MM.YYYY ili DD.MM.YYYY.
+    const m = String(s).match(/^(\d{2})\.(\d{2})\.(\d{4})\.?$/);
+    if (m) return `${m[3]}-${m[2]}-${m[1]}`;
+    return s;
+  };
+  const onSubmit = async (vals) => {
+    // (opciono) lagana validacija – ako koristiš, validiraj vals
+    const v = validateVals(vals);
     if (v) {
       setError(v);
       return;
     }
 
+    // napravi payload SAMO sa izmenjenim poljima
+    const payload = {};
+
+    // datumi – normalizuj format i šalji samo ako su promenjeni
+    const startIso = toIso(vals.start_date);
+    const endIso = toIso(vals.end_date);
+
+    if (startIso && startIso !== plan.start_date) payload.start_date = startIso;
+    if (endIso && endIso !== plan.end_date) payload.end_date = endIso;
+
+    // numerična polja – šalji samo ako je stvarno promenjeno
+    const pc = Number(vals.passenger_count);
+    const bd = Number(vals.budget);
+
+    if (!Number.isNaN(pc) && pc !== Number(plan.passenger_count)) {
+      payload.passenger_count = pc;
+    }
+    if (!Number.isNaN(bd) && bd !== Number(plan.budget)) {
+      payload.budget = bd;
+    }
+
+    // ako nema promena, nema PATCH-a
+    if (Object.keys(payload).length === 0) return;
+
     try {
       setSaving(true);
       setError("");
-      //    PATCH/PUT u zavisnosti od rute na backendu; najčešće PUT /travel-plans/{id}
-      await api.put(`/travel-plans/${id}`, {
-        start_date: form.start_date,
-        end_date: form.end_date,
-        passenger_count: Number(form.passenger_count),
-        budget: Number(form.budget),
-      });
-
-      //    Nakon uspeha – vodi korisnika na prikaz tog plana
+      await api.patch(`/travel-plans/${id}`, payload);
       navigate(`/dashboard/plans/${id}`);
     } catch (err) {
-      //    Backend validacija će vratiti poruke (npr. budžet, datumi, ograničenja)
-      setError("Update failed. Please check the entered values.");
+      console.log("BE full response:", err?.response?.data);
+      setError(
+        err?.response?.data?.message ||
+          err?.response?.data?.error ||
+          "Update failed. Please check the entered values."
+      );
     } finally {
       setSaving(false);
     }
@@ -191,15 +231,7 @@ export default function EditTravelPlan() {
                     busy={saving}
                     fieldErrors={{}} //    mapiraj 422 ako želiš detaljna polja
                     error={error}
-                    onSubmit={async (vals) => {
-                      //    validacija minimalna – backend je autoritet
-                      await doUpdateWith({
-                        start_date: vals.start_date,
-                        end_date: vals.end_date,
-                        passenger_count: Number(vals.passenger_count),
-                        budget: Number(vals.budget),
-                      });
-                    }}
+                    onSubmit={onSubmit}
                     onCancel={() => navigate(`/dashboard/plans/${id}`)}
                   />
                 )}

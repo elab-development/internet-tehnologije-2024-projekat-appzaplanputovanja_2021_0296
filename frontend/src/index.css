@@ -1,21 +1,118 @@
-/* ========== Global / helpers ==========
-   Ove klase ne remete Bootstrap, samo dopunjuju stil.
-*/
+/* === Design tokens (boje, senke, razmaci) === */
+:root {
+  --brand: #0d6efd;
+  --brand-600: #0b5ed7;
+  --secondary: #6f42c1; /* ljubičasta – sekundarna */
+  --accent: #ff7a59; /* akcenat za CTA/bedževe */
+  --text-muted: #6c757d;
+  --bg-soft: #f8f9fa;
+  --border: #e9ecef;
+  --radius: 14px;
+}
+
+/* Brand varijante dugmadi */
+.btn-brand {
+  background: var(--brand);
+  border-color: var(--brand);
+  color: #fff;
+  font-weight: 600;
+}
+.btn-brand:hover {
+  background: var(--brand-600);
+  border-color: var(--brand-600);
+}
+
+.btn-outline-brand {
+  border-color: var(--brand);
+  color: var(--brand);
+  font-weight: 600;
+}
+.btn-outline-brand:hover {
+  background: var(--brand);
+  color: #fff;
+}
+
+/* Bedževi – jedinstven identitet */
+.badge-brand {
+  background: var(--brand);
+}
+.badge-secondary {
+  background: var(--secondary);
+}
+.badge-accent {
+  background: var(--accent);
+}
+
+/* Aktivna stavka menija i fokus pristupačnost */
+.app-navbar .nav-link.active {
+  color: var(--brand);
+  font-weight: 600;
+  text-decoration: underline;
+}
+:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* Poštovanje korisničkih preferenci za animacije */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition: none !important;
+    animation: none !important;
+  }
+}
+
+/* (Opcionalno) Dark mode – lako uključivo */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg-soft: #0f1115;
+    --border: #1d2230;
+  }
+  body {
+    background: var(--bg-soft);
+  }
+  .card,
+  .tp-card,
+  .plan-item-card {
+    border-color: var(--border);
+  }
+  .app-footer {
+    border-top-color: var(--border);
+    color: #9aa3b2;
+  }
+}
+
+/* === Base / reset tweaks === */
+body {
+  font-family: "Poppins", sans-serif;
+  background-color: var(--bg-soft);
+  margin: 0;
+}
+
+/* =======================
+   Helpers / utilities
+========================= */
 .loading-box {
   text-align: center;
   padding: 3rem 0;
 }
-
 .loading-text {
   opacity: 0.8;
 }
 
-/* ==========
-   NAVBAR
-========== */
+.retry-alert {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+/* =======================
+   Navbar
+========================= */
 .app-navbar .navbar-brand {
   font-weight: 700;
   letter-spacing: 0.3px;
+  color: var(--brand) !important;
 }
 
 .app-navbar .nav-link {
@@ -23,44 +120,92 @@
 }
 
 .app-navbar .nav-link:hover {
-  color: #0d6efd;
+  color: var(--brand);
   text-decoration: underline;
 }
 
-/* ==========
-   HOME HERO / FOOTER
-========== */
-.hero {
-  background: #f8f9fa;
-  border-bottom: 1px solid #e9ecef;
+/* input širine u navbaru */
+.app-navbar .form-control {
+  min-width: 170px;
+}
+@media (max-width: 992px) {
+  .app-navbar .form-control {
+    min-width: 120px;
+  }
 }
 
+/* =======================
+   Hero & Footer
+========================= */
+.hero {
+  background: var(--bg-soft);
+  border-bottom: 1px solid var(--border);
+}
 .hero-title {
   font-weight: 600;
 }
-
 .hero-subtitle {
-  color: #6c757d;
+  color: var(--text-muted);
   max-width: 56rem; /* uži red radi čitljivosti */
 }
 
 .app-footer {
-  border-top: 1px solid #e9ecef;
-  padding: 0.75rem 0;
-  color: #6c757d;
+  border-top: 1px solid var(--border);
+  padding: 1.25rem 0;
+  color: var(--text-muted);
   font-size: 0.9rem;
 }
 
-/* ==========
-   DESTINATIONS FEED – alert/try again
-========== */
-.retry-alert {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
+/* =======================
+   Cards & Grid
+========================= */
+.card {
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.card:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--shadow-md);
 }
 
-/* ===== AUTH ===== */
+/* grid za listu planova */
+.plans-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: var(--space-2);
+}
+@media (min-width: 768px) {
+  .plans-grid {
+    gap: var(--space-3);
+  }
+}
+
+/* Travel plan kartica */
+.tp-card {
+  border-radius: var(--radius);
+  border: 1px solid #eaeaea;
+  cursor: pointer;
+}
+
+/* Stavke plana (Show Plan) */
+.plan-item-card {
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+}
+.plan-item-card:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-md);
+}
+.plan-item-img {
+  height: 120px;
+  object-fit: cover;
+  border-top-left-radius: 0.5rem;
+  border-top-right-radius: 0.5rem;
+}
+
+/* =======================
+   Auth
+========================= */
 .auth-wrap {
   max-width: 480px;
   margin: 0 auto;
@@ -72,95 +217,17 @@
   font-weight: 500;
 }
 
-/* Navbar hover already defined… */
-
-/* Buttons tweaks if needed */
-.btn-primary {
-  font-weight: 600;
-}
-
-body {
-  font-family: "Poppins", sans-serif;
-  background-color: #f8f9fa;
-  margin: 0;
-}
-
-.navbar-brand {
-  color: #0d6efd !important;
-}
-
-.card {
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
-}
-
-.card:hover {
-  transform: translateY(-3px);
-  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15);
-}
-
-.app-navbar .form-control {
-  min-width: 170px;
-}
-@media (max-width: 992px) {
-  .app-navbar .form-control {
-    min-width: 120px;
-  }
-}
-
-/* kompaktnije kartice i lep grid */
-.plans-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-  gap: 16px;
-}
-
-.tp-card {
-  border-radius: 14px;
-  border: 1px solid #eaeaea;
-}
-/* src/index.css – fragmenti za Create plan formu i par layout pomoćnika */
-.create-plan .tp-form {
+/* =======================
+   Create / Edit Plan
+========================= */
+.create-plan .tp-form,
+.edit-plan-container .tp-form {
   max-width: 980px;
+  margin: 0 auto;
 }
 
-.app-footer {
-  padding: 1.25rem 0;
-  border-top: 1px solid rgba(0, 0, 0, 0.06);
-  color: #6c757d;
-}
-
-.loading-box {
-  padding: 3rem 0;
-  text-align: center;
-}
-
-.plans-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-  gap: 12px;
-}
-
-.tp-card {
-  cursor: pointer;
-}
-
-.plan-item-card {
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
-}
-.plan-item-card:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-}
-.plan-item-img {
-  height: 120px;
-  object-fit: cover;
-  border-top-left-radius: 0.5rem;
-  border-top-right-radius: 0.5rem;
-}
-
-/* === Edit Travel Plan page === */
 .edit-plan-container .card {
-  border: 1px solid #e9ecef;
+  border: 1px solid var(--border);
 }
 
 .edit-plan-container .card-header h5 {

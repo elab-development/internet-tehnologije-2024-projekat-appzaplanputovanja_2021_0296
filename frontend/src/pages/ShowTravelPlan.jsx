@@ -162,6 +162,7 @@ export default function ShowTravelPlan() {
           <div className="row row-cols-1 row-cols-sm-2 row-cols-md-3 row-cols-lg-5 g-3">
             {items.map((item) => {
               const activity = item.activity || {};
+              const title = item.name ?? activity.name ?? "Activity";
               const img =
                 activity.image_url ||
                 "https://images.unsplash.com/photo-1500530855697-b586d89ba3ee";
@@ -171,11 +172,11 @@ export default function ShowTravelPlan() {
                   <div className="card h-100 shadow-sm border-0 plan-item-card">
                     <img
                       src={img}
-                      alt={activity.name}
+                      alt={title}
                       className="card-img-top plan-item-img"
                     />
                     <div className="card-body d-flex flex-column">
-                      <h6 className="fw-bold mb-1">{activity.name}</h6>
+                      <h6 className="fw-bold mb-1">{title}</h6>
                       {activity.type && (
                         <span className="badge bg-secondary mb-2">
                           {activity.type}

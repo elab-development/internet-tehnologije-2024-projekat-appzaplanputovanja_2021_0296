@@ -2,6 +2,7 @@
 import React, { useEffect, useState } from "react";
 import {
   Link,
+  NavLink,
   useLocation,
   useNavigate,
   useSearchParams,
@@ -76,10 +77,10 @@ export default function NavBar({ variant = "auto", onDestinationsClick }) {
     <nav className="app-navbar navbar navbar-expand-lg navbar-light bg-light shadow-sm sticky-top">
       <div className="container">
         {/*  Brand: home za guest/home, dashboard reset za dashboard */}
-        <Link className="navbar-brand fw-bold" to="/">
-          Travel Planner
+        <Link className="navbar-brand d-flex align-items-center gap-2" to="/">
+          <img src="/travel-icon.png" alt="Travel Planner" height="22" />
+          <span className="fw-bold">Travel Planner</span>
         </Link>
-
         <button
           className="navbar-toggler"
           type="button"

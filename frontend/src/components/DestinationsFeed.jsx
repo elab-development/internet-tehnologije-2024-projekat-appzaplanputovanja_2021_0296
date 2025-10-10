@@ -16,9 +16,7 @@ export default function DestinationsFeed({
     try {
       const unique = new Map();
       let page = 1;
-      let keepGoing = true;
-
-      while (keepGoing && page <= 5) {
+      while (true) {
         const { data } = await api.get(`/activities?page=${page}`);
         console.log("Activities response:", data);
         const items = data?.data ?? [];
@@ -28,9 +26,10 @@ export default function DestinationsFeed({
           arr.push(a);
           unique.set(key, arr);
         });
-        const lastPage = data?.meta?.last_page ?? page;
-        keepGoing = page < lastPage;
-        page += 1;
+        const current = data?.meta?.current_page ?? page;
+        const last = data?.meta?.last_page ?? current;
+        if (current >= last) break;
+        page = current + 1;
       }
 
       // sortiraj po lokaciji
@@ -88,7 +87,12 @@ export default function DestinationsFeed({
         <DestinationCard
           key={loc}
           name={loc}
-          activities={byLocation[loc]}
+          // prikazujemo samo paktivnosti po destinaciji
+          activities={byLocation[loc]
+            .filter((a) => a.type !== "Transport" && a.type !== "Accommodation")
+            //.slice(0, 15)} // prvih 15 slobodnih aktivnosti
+            .sort(() => Math.random() - 0.5) // nasumično izmeša redosled
+            .slice(0, 15)} // uzmi 15 nasumičnih
           onOpen={() => onOpenDestination?.(loc)}
           onAddToPlan={(activity) => onAddActivityToPlan?.(loc, activity)}
         />

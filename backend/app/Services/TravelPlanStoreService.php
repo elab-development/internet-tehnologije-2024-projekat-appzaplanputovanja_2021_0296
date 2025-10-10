@@ -28,10 +28,26 @@ class TravelPlanStoreService
             // 2) Popuni raspored odgovarajućim aktivnostima (koliko budžet dozvoljava)
             $this->fillWithMatchingActivities($plan);
 
+            $this->assertMandatoryItems($plan);
+            
             return $plan->fresh(['planItems.activity']);
         });
     }
 
+    private function assertMandatoryItems(TravelPlan $plan): void
+    {
+        $transportCount = $plan->planItems()
+            ->whereHas('activity', fn($q) => $q->where('type', 'Transport'))
+            ->count();
+
+        $accommodationCount = $plan->planItems()
+            ->whereHas('activity', fn($q) => $q->where('type', 'Accommodation'))
+            ->count();
+
+       if ($transportCount !== 2 || $accommodationCount < 1) {
+            abort(422, 'Mandatory items missing. Increase budget or adjust dates.');
+        }
+    }
     /**
      * Generiše: transport (start->dest), accommodation (14:00->09:00), transport (dest->start).
      * Poštuje budžet i računa amount = price * passenger_count.
@@ -44,11 +60,11 @@ class TravelPlanStoreService
         $checkoutTime  = Setting::getValue('checkout_time',  '09:00');
         $returnStart   = Setting::getValue('return_start',   '15:00');
 
-        // Pronadji TRANSPORT varijantu (po enum transport_mode) za datu destinaciju
-        $transport = Activity::where('type','Transport')
-            ->where('location', $plan->destination)
+        // Pronadji TRANSPORT varijantu (po enum transport_mode) 
+        $transport = Activity::where('type', 'Transport')
             ->where('transport_mode', $plan->transport_mode)
-            ->orderBy('price')->first();
+            ->orderBy('price')
+            ->first();
 
         // Pronadji ACCOMMODATION varijantu (po enum accommodation_class) za destinaciju
         $accommodation = Activity::where('type','Accommodation')
@@ -57,24 +73,26 @@ class TravelPlanStoreService
             ->orderBy('price')->first();
 
         if (!$transport || !$accommodation) {
-            abort(422, 'Mandatory activities are missing for the selected transport or accommodation. Add the appropriate Activity variants.');
+            abort(422, 'There are no activities for the selected transportation or accommodation at the selected location. 
+            Please select transportation and accommodation again.');
         }
+        $mandatoryTotal = (($transport->price * 2) + $accommodation->price) * $plan->passenger_count;
+        if ($mandatoryTotal > (float)$plan->budget) {
+            abort(422, 'The budget does not cover mandatory transportation (both ways) and accommodation.');
+        }
+
         // Outbound
         $from = Carbon::parse($plan->start_date.' '.$outboundStart);
         $to   = (clone $from)->addMinutes($transport->duration);
-        $transport->name="Transport {$plan->start_location} → {$plan->destination} ({$plan->transport_mode})";
-        $this->createItemIfBudgetAllows(
-            $plan,
-            $transport,
-            $from,
-            $to
-        );
+        $outboundTransport = clone $transport; //clon da bi sacuvala i return varijantu
+        $outboundTransport->name = "Transport {$plan->start_location} → {$plan->destination} ({$plan->transport_mode})";
+        $this->createMandatoryItemOrFail($plan, $outboundTransport, $from, $to);
 
         // Accommodation – ceo boravak
         $accFrom = Carbon::parse($plan->start_date)->setTimeFromTimeString($checkinTime);
         $accTo   = Carbon::parse($plan->end_date)->setTimeFromTimeString($checkoutTime);
         $accommodation->name = "Accommodation in {$plan->destination} ({$plan->accommodation_class})";
-        $this->createItemIfBudgetAllows(
+        $this->createMandatoryItemOrFail(
             $plan,
             $accommodation,
             $accFrom,
@@ -85,13 +103,9 @@ class TravelPlanStoreService
         // Return
         $retFrom = Carbon::parse($plan->end_date.' '.$returnStart);
         $retTo   = (clone $retFrom)->addMinutes($transport->duration);
-        $transport->name = "Transport {$plan->destination} → {$plan->start_location} ({$plan->transport_mode})";
-        $this->createItemIfBudgetAllows(
-            $plan,
-            $transport,
-            $retFrom,
-            $retTo
-        );
+        $returnTransport = clone $transport;
+        $returnTransport->name = "Transport {$plan->destination} → {$plan->start_location} ({$plan->transport_mode})";
+        $this->createMandatoryItemOrFail($plan, $returnTransport, $retFrom, $retTo);
     }
 
     /**
@@ -277,6 +291,49 @@ class TravelPlanStoreService
         $amount = $activity->price * $plan->passenger_count;
         if ($plan->total_cost + $amount > $plan->budget) {
             return null;
+        }
+
+        $item = PlanItem::create([
+            'travel_plan_id' => $plan->id,
+            'activity_id'    => $activity->id,
+            'name'           => $activity->name,
+            'time_from'      => $timeFrom,
+            'time_to'        => $timeTo,
+            'amount'         => $amount,
+        ]);
+
+        $plan->increment('total_cost', $amount);
+        $plan->refresh();
+
+        return $item;
+    }
+    public function createMandatoryItemOrFail( 
+        TravelPlan $plan,
+        Activity $activity,
+        Carbon $timeFrom,
+        Carbon $timeTo,
+        bool $ignoreOverlap = false
+    ): PlanItem {
+        // guard: kraj mora biti pre ili na dan end_date (za povratni transport)
+        if ($timeTo->gt(Carbon::parse($plan->end_date)->endOfDay())) {
+            abort(422, 'Mandatory item exceeds the plan end date window.');
+        }
+
+        // overlap provera (Accommodation se ignoriše)
+        if (!$ignoreOverlap) {
+            $overlap = $plan->planItems()
+                ->whereHas('activity', fn($q) => $q->where('type','!=','Accommodation'))
+                ->where('time_from','<',$timeTo)
+                ->where('time_to','>',$timeFrom)
+                ->exists();
+            if ($overlap) {
+                abort(422, 'Mandatory item overlaps with existing schedule.');
+            }
+        }
+
+        $amount = $activity->price * $plan->passenger_count;
+        if ($plan->total_cost + $amount > $plan->budget) {
+            abort(422, 'Budget too low to include mandatory item.');
         }
 
         $item = PlanItem::create([

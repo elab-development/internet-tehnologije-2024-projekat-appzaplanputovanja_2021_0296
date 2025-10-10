@@ -72,9 +72,10 @@ class TravelPlanController extends Controller
     {
         $this->authorize('create', TravelPlan::class);
 
+         $validStartLocations = ['Belgrade','Ljubljana','Zagreb','Sarajevo','Novi Sad','Niš'];
 
         $data = $request->validate([
-            'start_location'  => 'required|string',
+            'start_location'  => ['required', 'string', Rule::in($validStartLocations)],
             'destination'     => ['required', 'string',
                                  Rule::in(Activity::query()->distinct()->pluck('location')->toArray()), ], //PHP niz od jedinstvenih vrednosti iz kolone location iz activities tabele
             'start_date'      => ['required', 'date', 'after:today'],
@@ -84,7 +85,7 @@ class TravelPlanController extends Controller
             'preferences'     => 'required|array',
             'preferences.*'   => [
                                 Rule::in(Activity::availablePreferenceTypes()),],
-            'transport_mode' => ['required', Rule::in(['airplane','train','car','bus','ferry','cruise ship'])],
+            'transport_mode' => ['required', Rule::in(['airplane','train','car','bus'])],
             'accommodation_class'=> ['required',
                                     Rule::in(['hostel','guesthouse','budget_hotel','standard_hotel','boutique_hotel','luxury_hotel',
                                     'resort','apartment','bed_and_breakfast','villa','mountain_lodge','camping','glamping'])],
@@ -132,7 +133,7 @@ class TravelPlanController extends Controller
                 'preferences'     => ['prohibited'],
                 'transport_mode'  => ['prohibited'],
                 'accommodation_class' => ['prohibited'],
-                'start_date'      => ['sometimes','required','date','after:now'],
+                'start_date' => ['sometimes','required','date','after:today'],
                 'end_date'        => ['sometimes','required','date','after_or_equal:start_date'],
                 'passenger_count' => ['sometimes','required','integer','min:1'],
                 'budget'          => ['sometimes','numeric','min:1', 
