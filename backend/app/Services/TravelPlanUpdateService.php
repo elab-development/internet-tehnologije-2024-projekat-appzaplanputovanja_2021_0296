@@ -19,6 +19,13 @@ class TravelPlanUpdateService
     {
         [$cfg, $start, $end, $outbound, $return] = $this->bootstrapContext($plan);
 
+        $floor = $this->mandatoryCostFloor($plan);
+        if ($floor > (float)$plan->budget) {
+            $missing = $floor - (float)$plan->budget;
+            abort(422, sprintf(
+                'Budget too low for mandatory items. Minimum required: %.2f (missing %.2f).',
+                $floor, $missing
+            ));}
         // izbaci stavke van [start,end] (Accommodation se NE izuzima – mora da stane u prozor)
         foreach ($plan->planItems as $pi) {
             $from = Carbon::parse($pi->time_from);
@@ -36,6 +43,8 @@ class TravelPlanUpdateService
 
         // popuni NOVO-OTVORENE dane (pre starog starta i posle starog kraja)
         $this->fillNewlyOpenedDays($plan, $oldStart, $oldEnd);
+
+        $this->assertMandatoryItems($plan);
     }
 
     /**
@@ -94,8 +103,9 @@ class TravelPlanUpdateService
             'returnStart'            => $hasSetting ? Setting::getValue('return_start',  '15:00') : '15:00',
         ];
 
-        $start = Carbon::parse($plan->start_date);
-        $end   = Carbon::parse($plan->end_date);
+        $start = Carbon::parse($plan->start_date)->startOfDay();
+
+        $end = Carbon::parse($plan->end_date)->endOfDay();
 
         $items = $plan->planItems()->with('activity')->get();
         $outbound = $items->filter(fn($pi) =>
@@ -110,6 +120,25 @@ class TravelPlanUpdateService
 
         return [$cfg, $start, $end, $outbound, $return];
     }
+
+    private function mandatoryCostFloor(TravelPlan $plan): float
+        {
+            $transport = Activity::where('type','Transport')
+                ->where('location', $plan->destination)
+                ->where('transport_mode', $plan->transport_mode)
+                ->orderBy('price')->first();
+
+            $accommodation = Activity::where('type','Accommodation')
+                ->where('location', $plan->destination)
+                ->where('accommodation_class', $plan->accommodation_class)
+                ->orderBy('price')->first();
+
+            if (!$transport || !$accommodation) {
+                abort(422, 'No transport/accommodation variants for the selected destination/class.');
+            }
+
+            return (($transport->price * 2) + $accommodation->price) * $plan->passenger_count;
+        }
 
     private function upsertMandatoryItems(TravelPlan $plan, array $cfg): void
     {
@@ -157,6 +186,10 @@ class TravelPlanUpdateService
         );
     }
 
+   /**
+ * Upsert mandatory (Transport / Accommodation) activity for a plan.
+ * Ensures mandatory items always exist; may remove optional ones to fit the budget.
+ */
     private function upsertSingleMandatory(
         TravelPlan $plan,
         string $type,
@@ -167,17 +200,38 @@ class TravelPlanUpdateService
         Carbon $to,
         bool $ignoreOverlap = false
     ): void {
-        $existing = $plan->planItems->first(function(PlanItem $pi) use ($type, $matchFn) {
+        $existing = $plan->planItems->first(function (PlanItem $pi) use ($type, $matchFn) {
             return optional($pi->activity)->type === $type && $matchFn($pi);
         });
 
+        // --- Guard: vreme povratka unutar datuma plana
+        if ($to->gt(Carbon::parse($plan->end_date)->endOfDay())) {
+            abort(422, 'Mandatory item exceeds the plan end date window.');
+        }
+
+        // --- Guard: ne sme se preklapati sa drugim (osim ako je Accommodation)
+        if (!$ignoreOverlap) {
+            $overlap = $plan->planItems()
+                ->whereHas('activity', fn($q) => $q->where('type', '!=', 'Accommodation'))
+                ->where('time_from', '<', $to)
+                ->where('time_to', '>', $from)
+                ->when($existing, fn($q) => $q->where('id', '!=', $existing->id))
+                ->exists();
+
+            if ($overlap) {
+                abort(422, 'Mandatory item overlaps with existing schedule.');
+            }
+        }
+
         $amount = $activity->price * $plan->passenger_count;
 
+        // --- Ako već postoji, samo ažuriraj
         if ($existing) {
             if ((float)$existing->amount !== (float)$amount) {
                 $delta = $amount - (float)$existing->amount;
                 $plan->increment('total_cost', $delta);
             }
+
             $existing->update([
                 'activity_id' => $activity->id,
                 'name'        => $displayName,
@@ -185,21 +239,50 @@ class TravelPlanUpdateService
                 'time_to'     => $to,
                 'amount'      => $amount,
             ]);
-        } else {
-            if ($plan->total_cost + $amount <= $plan->budget) {
-                PlanItem::create([
-                    'travel_plan_id' => $plan->id,
-                    'activity_id'    => $activity->id,
-                    'name'           => $displayName,
-                    'time_from'      => $from,
-                    'time_to'        => $to,
-                    'amount'         => $amount,
-                ]);
-                $plan->increment('total_cost', $amount);
-            }
+
+            $plan->refresh();
+            return;
         }
 
+        // --- Ako ne postoji: proveri budžet
+        if ($plan->total_cost + $amount > $plan->budget) {
+            // Pokušaj da oslobodiš prostor uklanjanjem neobaveznih aktivnosti
+            $this->shrinkToBudget($plan);
+            $plan->refresh();
+        }
+
+        // --- Ako ni sada nema mesta — abortuj
+        if ($plan->total_cost + $amount > $plan->budget) {
+            abort(422, 'Cannot fit mandatory items within budget even after removing optional activities.');
+        }
+
+        // --- Kreiraj novu mandatory stavku
+        PlanItem::create([
+            'travel_plan_id' => $plan->id,
+            'activity_id'    => $activity->id,
+            'name'           => $displayName,
+            'time_from'      => $from,
+            'time_to'        => $to,
+            'amount'         => $amount,
+        ]);
+
+        $plan->increment('total_cost', $amount);
         $plan->refresh();
+    }
+
+    private function assertMandatoryItems(TravelPlan $plan): void
+    {
+        $transportCount = $plan->planItems()
+            ->whereHas('activity', fn($q) => $q->where('type', 'Transport'))
+            ->count();
+
+        $accommodationCount = $plan->planItems()
+            ->whereHas('activity', fn($q) => $q->where('type', 'Accommodation'))
+            ->count();
+
+        if ($transportCount !== 2 || $accommodationCount < 1) {
+            abort(422, 'Mandatory items missing. Increase budget or adjust dates.');
+        }
     }
 
     private function fillNewlyOpenedDays(TravelPlan $plan, Carbon $oldStart, Carbon $oldEnd): void

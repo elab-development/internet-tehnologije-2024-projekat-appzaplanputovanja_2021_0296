@@ -3,8 +3,16 @@ export default function FormInput({
   id,
   type = "text",
   error,
-  ...props
+  disabled,
+  value,
+  defaultValue,
+  onChange,
+  ...rest
 }) {
+  // Ako je polje zaključano → koristi defaultValue + disabled
+  const inputProps = disabled
+    ? { defaultValue: defaultValue ?? value, disabled: true }
+    : { value, onChange, ...rest };
   return (
     <div className="mb-3">
       {label && (
@@ -12,7 +20,7 @@ export default function FormInput({
           {label}
         </label>
       )}
-      <input id={id} type={type} className="form-control" {...props} />
+      <input id={id} type={type} className="form-control" {...inputProps} />
       {error ? <div className="invalid-feedback d-block">{error}</div> : null}
     </div>
   );

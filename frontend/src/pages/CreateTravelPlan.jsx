@@ -9,14 +9,7 @@ import TravelPlanForm from "../components/ui/TravelPlanForm";
 // Enumerations aligned with backend migrations
 // transport_mode: ['airplane','train','car','bus','ferry','cruise ship']
 // accommodation_class: ['hostel','guesthouse','budget_hotel','standard_hotel','boutique_hotel','luxury_hotel','resort','apartment','bed_and_breakfast','villa','mountain_lodge','camping','glamping']
-const TRANSPORT_MODES = [
-  "airplane",
-  "train",
-  "car",
-  "bus",
-  "ferry",
-  "cruise ship",
-];
+const TRANSPORT_MODES = ["airplane", "train", "car", "bus"];
 
 const ACCOMMODATION_CLASSES = [
   "hostel",
@@ -50,6 +43,15 @@ const PREFERENCES = [
   "want_to_learn",
   "active_vacation",
   "research_of_tradition",
+];
+
+const START_LOCATIONS = [
+  "Belgrade",
+  "Ljubljana",
+  "Zagreb",
+  "Sarajevo",
+  "Novi Sad",
+  "Niš",
 ];
 
 const humanize = (s) =>
@@ -114,17 +116,16 @@ export default function CreateTravelPlan() {
     try {
       const unique = new Set();
       let page = 1;
-      let keepGoing = true;
-
-      while (keepGoing && page <= 10) {
+      while (true) {
         const { data } = await api.get(`/activities?page=${page}`);
         const items = data?.data ?? [];
         items.forEach((a) => {
           if (a.location) unique.add(a.location);
         });
-        const last = data?.meta?.last_page ?? page;
-        keepGoing = page < last;
-        page++;
+        const cur = data?.meta?.current_page ?? page;
+        const last = data?.meta?.last_page ?? cur;
+        if (cur >= last) break;
+        page = cur + 1;
       }
       setDestinations(Array.from(unique).sort((a, b) => a.localeCompare(b)));
     } catch (e) {
@@ -206,6 +207,7 @@ export default function CreateTravelPlan() {
           }}
           lockedFields={[]} //    na create nema zaključanih polja
           lists={{
+            startLocations: START_LOCATIONS,
             destinations,
             transportModes: TRANSPORT_MODES,
             accommodationOptions: ACCOMM_OPTS,

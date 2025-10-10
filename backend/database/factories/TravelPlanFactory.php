@@ -12,11 +12,13 @@ class TravelPlanFactory extends Factory
 {
     protected $model = TravelPlan::class;
 
-    private array $transportModes = ['airplane','train','car','bus','ferry','cruise ship'];
+    private array $transportModes = ['airplane','train','car','bus'];
     private array $accClasses = [
         'hostel','guesthouse','budget_hotel','standard_hotel','boutique_hotel','luxury_hotel',
         'resort','apartment','bed_and_breakfast','villa','mountain_lodge','camping','glamping'
     ];
+
+    private array $startLocations = ['Belgrade','Ljubljana','Zagreb','Sarajevo','Novi Sad','Niš'];
 
     public function definition(): array
     {
@@ -39,7 +41,7 @@ class TravelPlanFactory extends Factory
 
         return [
             'user_id'            => $user->id,
-            'start_location'     => $this->faker->randomElement(['Belgrade','Novi Sad','Niš','Prague','Vienna']),
+            'start_location' => $this->faker->randomElement($this->startLocations),
             'destination'        => $destination,
             'start_date'         => $start->toDateString(),
             'end_date'           => $end->toDateString(),

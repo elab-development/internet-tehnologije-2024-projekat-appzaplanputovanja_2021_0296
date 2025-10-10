@@ -15,9 +15,7 @@ class TravelPlanSeeder extends Seeder
 {
     public function run(): void
     {
-       // $users = User::all();
-       $users = User::where('is_admin', false)->get(); // samo obični korisnici mogu kreirati planove putovanja
-
+        $users = User::where('is_admin', false)->get();
         if ($users->isEmpty()) {
             $users = User::factory()->count(2)->create();
         }
@@ -28,17 +26,16 @@ class TravelPlanSeeder extends Seeder
             return;
         }
 
+        $startLocations = ['Belgrade','Ljubljana','Zagreb','Sarajevo','Novi Sad','Niš'];
+
         foreach ($users as $user) {
-            // izaberi destinaciju koja ima i Transport i Accommodation varijante
             $destination = collect($locations)->random();
 
-            // izaberi postojeće enum vrednosti (moraju postojati Activity varijante) 
             $modes = Activity::where('type','Transport')->where('location',$destination)
                 ->distinct()->pluck('transport_mode')->filter()->values()->all();
             $accs  = Activity::where('type','Accommodation')->where('location',$destination)
                 ->distinct()->pluck('accommodation_class')->filter()->values()->all();
             if (empty($modes) || empty($accs)) {
-                // preskoči ovu destinaciju ako nema potrebne varijante
                 continue;
             }
 
@@ -48,14 +45,13 @@ class TravelPlanSeeder extends Seeder
             $start = Carbon::now()->addDays(rand(15, 60))->startOfDay();
             $end   = (clone $start)->addDays(rand(3, 5));
 
-            // formiraj preferences kao podskup dostupnih tipova 
             $prefsAll = Activity::availablePreferenceTypes();
             shuffle($prefsAll);
             $prefs = array_slice($prefsAll, 0, rand(4, 6));
 
             $plan = TravelPlan::factory()->make([
                 'user_id'             => $user->id,
-                'start_location'      => collect(['Belgrade','Novi Sad','Niš','Subotica'])->random(),
+                'start_location'      => collect($startLocations)->random(),
                 'destination'         => $destination,
                 'start_date'          => $start->toDateString(),
                 'end_date'            => $end->toDateString(),
@@ -67,52 +63,93 @@ class TravelPlanSeeder extends Seeder
                 'accommodation_class' => $accClass,
             ]);
 
-            // kreiraj u transakciji + obavezne PlanItem
             DB::transaction(function () use ($plan) {
                 $plan->save();
 
+                // Settings (fallback ako nema zapisa)
                 $outboundStart  = Setting::getValue('outbound_start', '08:00');
                 $checkinTime    = Setting::getValue('checkin_time',   '14:00');
                 $checkoutTime   = Setting::getValue('checkout_time',  '09:00');
                 $returnStart    = Setting::getValue('return_start',   '15:00');
 
-                // TRANSPORT zapis koji se slaže sa izborom plana
-                $transport = Activity::where('type','Transport')
-                    ->where('location', $plan->destination)
-                    ->where('transport_mode', $plan->transport_mode)
-                    ->orderBy('price')
-                    ->first();
+                $settings = (object)[
+                    'outbound_start' => $outboundStart,
+                    'checkin_time'   => $checkinTime,
+                    'checkout_time'  => $checkoutTime,
+                    'return_start'   => $returnStart,
+                ];
 
-                // ACCOMMODATION zapis koji se slaže sa izborom plana
-                $accommodation = Activity::where('type','Accommodation')
-                    ->where('location', $plan->destination)
-                    ->where('accommodation_class', $plan->accommodation_class)
-                    ->orderBy('price')
-                    ->first();
-
-                // 1) Odlazni transport (start_date @ outbound_start)
-                $depFrom = Carbon::parse($plan->start_date.' '.$outboundStart);
-                $depTo   = (clone $depFrom)->addMinutes($transport->duration);
-                $this->attachItem($plan, $transport, $depFrom, $depTo, "Transport {$plan->start_location} → {$plan->destination} ({$plan->transport_mode})");
-
-                // 2) Smeštaj (od checkin do checkout, preskače proveru preklapanja po prirodi)
-                $accFrom = Carbon::parse($plan->start_date.' '.$checkinTime);
-                $accTo   = Carbon::parse($plan->end_date.' '.$checkoutTime);
-                $this->attachItem($plan, $accommodation, $accFrom, $accTo, "Accommodation in {$plan->destination} ({$plan->accommodation_class})");
-
-                // 3) Povratni transport (end_date @ return_start)
-                $retFrom = Carbon::parse($plan->end_date.' '.$returnStart);
-                $retTo   = (clone $retFrom)->addMinutes($transport->duration);
-                $this->attachItem($plan, $transport, $retFrom, $retTo, "Transport {$plan->destination} → {$plan->start_location} ({$plan->transport_mode})");
+                // === OBAVEZNE STAVKE (bez budžet filtera; force=true) ===
+                $this->attachMandatoryItems($plan, $settings);
             });
         }
     }
 
-    private function attachItem(TravelPlan $plan, Activity $activity, Carbon $from, Carbon $to, string $name): void
+    // --- obavezne stavke izdvojene kao METODA na nivou KLASE ---
+    private function attachMandatoryItems(TravelPlan $plan, $settings): void
     {
-        $amount = $activity->price * $plan->passenger_count; // amount = price * passenger_count 
-        if ($plan->total_cost + $amount > $plan->budget) {
-            return; // poštuj ograničenje budžeta pre kreiranja 
+        // 1) OUT transport
+        $outName = "Transport {$plan->start_location} → {$plan->destination} ({$plan->transport_mode})";
+        $out = Activity::firstOrCreate([
+            'type'           => 'Transport',
+            'location'       => $plan->destination,
+            'transport_mode' => $plan->transport_mode,
+            'name'           => $outName,
+        ], [
+            'price' => 80, 'duration' => 120,
+            'preference_types' => $plan->preferences ?? [],
+        ]);
+
+        // 2) RETURN transport
+        $retName = "Transport {$plan->destination} → {$plan->start_location} ({$plan->transport_mode})";
+        $ret = Activity::firstOrCreate([
+            'type'           => 'Transport',
+            'location'       => $plan->destination,
+            'transport_mode' => $plan->transport_mode,
+            'name'           => $retName,
+        ], [
+            'price' => 80, 'duration' => 120,
+            'preference_types' => $plan->preferences ?? [],
+        ]);
+
+        // 3) ACCOMMODATION
+        $accName = "Accommodation in {$plan->destination} ({$plan->accommodation_class})";
+        $acc = Activity::firstOrCreate([
+            'type'                => 'Accommodation',
+            'location'            => $plan->destination,
+            'accommodation_class' => $plan->accommodation_class,
+            'name'                => $accName,
+        ], [
+            'price' => 65, 'duration' => 24*60,
+            'preference_types' => $plan->preferences ?? [],
+        ]);
+
+        // vremena
+        $outTime = Carbon::parse(($plan->start_date).' '.($settings->outbound_start ?? '08:00'));
+        $retTime = Carbon::parse(($plan->end_date).' '.($settings->return_start   ?? '15:00'));
+        $checkin = Carbon::parse(($plan->start_date).' '.($settings->checkin_time ?? '14:00'));
+        $checkout= Carbon::parse(($plan->end_date).' '.($settings->checkout_time  ?? '10:00'));
+
+        // force = true  -> ignoriše budžetski cutoff za obavezne
+        $this->attachItem($plan, $out, $outTime, (clone $outTime)->addMinutes($out->duration), $outName, true);
+        $this->attachItem($plan, $acc, $checkin, $checkout, $accName, true);
+        $this->attachItem($plan, $ret, $retTime, (clone $retTime)->addMinutes($ret->duration), $retName, true);
+    }
+
+    // --- amount pravilno (smeštaj = cena * broj noći), + opcioni $force ---
+    private function attachItem(TravelPlan $plan, Activity $activity, Carbon $from, Carbon $to, string $name, bool $force = false): void
+    {
+        // obračun iznosa
+        if ($activity->type === 'Accommodation') {
+            $nights = max(1, Carbon::parse($plan->end_date)->diffInDays(Carbon::parse($plan->start_date)));
+            $amount = $activity->price * $nights; // po noćenju
+        } else {
+            $amount = $activity->price * $plan->passenger_count; // transport i ostalo po osobi
+        }
+
+        // budžet filter samo ako NIJE force
+        if (!$force && ($plan->total_cost + $amount > $plan->budget)) {
+            return;
         }
 
         PlanItem::create([
@@ -127,3 +164,4 @@ class TravelPlanSeeder extends Seeder
         $plan->increment('total_cost', $amount);
     }
 }
+

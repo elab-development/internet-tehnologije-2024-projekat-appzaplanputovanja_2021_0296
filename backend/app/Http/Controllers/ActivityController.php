@@ -83,7 +83,7 @@ class ActivityController extends Controller
                                     Rule::in(Activity::availablePreferenceTypes()), ],
             'image_url'          => 'nullable|url|max:2048',
             'transport_mode'     => ['required_if:type,Transport','prohibited_unless:type,Transport',
-                                     Rule::in(['airplane','train','car','bus','ferry','cruise ship'])],
+                                     Rule::in(['airplane','train','car','bus'])],
             'accommodation_class'=> ['required_if:type,Accommodation','prohibited_unless:type,Accommodation',
                                     Rule::in(['hostel','guesthouse','budget_hotel','standard_hotel','boutique_hotel','luxury_hotel',
                                     'resort','apartment','bed_and_breakfast','villa','mountain_lodge','camping','glamping'])],

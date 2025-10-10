@@ -18,7 +18,7 @@ use App\Http\Controllers\{AuthController, TravelPlanController, ActivityControll
 // PUBLIC (svi)
 Route::apiResource('activities', ActivityController::class)
     ->only(['index','show']);
-
+    
 // PUBLIC (auth)
 Route::prefix('auth')->group(function () {
     Route::post('register', [AuthController::class, 'register'])->name('auth.register');

@@ -49,6 +49,23 @@ export default function TravelPlanForm({
     ...initialValues,
   });
 
+  React.useEffect(() => {
+    setForm((f) => {
+      const next = { ...f };
+
+      if (!next.start_location && (lists.startLocations?.length ?? 0) > 0) {
+        next.start_location = lists.startLocations[0]; // statičan niz koji šalješ iz CreateTravelPlan
+      }
+
+      if (!next.destination && (lists.destinations?.length ?? 0) > 0) {
+        const first = lists.destinations[0];
+        next.destination = typeof first === "string" ? first : first.value;
+      }
+
+      return next;
+    });
+  }, [lists.startLocations, lists.destinations]);
+
   //   helperi za promenu polja
   const onChange = (e) => {
     const { name, value } = e.target;
@@ -91,7 +108,8 @@ export default function TravelPlanForm({
                 <FormInput
                   label="Start location"
                   name="start_location"
-                  value={form.start_location ?? ""}
+                  disabled
+                  defaultValue={form.start_location ?? ""}
                 />
               </div>
             )}
@@ -100,7 +118,8 @@ export default function TravelPlanForm({
                 <FormInput
                   label="Destination"
                   name="destination"
-                  value={form.destination ?? ""}
+                  disabled
+                  defaultValue={form.destination ?? ""}
                 />
               </div>
             )}
@@ -109,7 +128,8 @@ export default function TravelPlanForm({
                 <FormInput
                   label="Transport mode"
                   name="transport_mode"
-                  value={humanize(form.transport_mode ?? "")}
+                  disabled
+                  defaultValue={humanize(form.transport_mode ?? "")}
                 />
               </div>
             )}
@@ -118,7 +138,8 @@ export default function TravelPlanForm({
                 <FormInput
                   label="Accommodation class"
                   name="accommodation_class"
-                  value={humanize(form.accommodation_class ?? "")}
+                  disabled
+                  defaultValue={humanize(form.accommodation_class ?? "")}
                 />
               </div>
             )}
@@ -127,7 +148,10 @@ export default function TravelPlanForm({
                 <FormInput
                   label="Preferences"
                   name="preferences"
-                  value={(form.preferences || []).map(humanize).join(", ")}
+                  disabled
+                  defaultValue={(form.preferences || [])
+                    .map(humanize)
+                    .join(", ")}
                 />
               </div>
             )}
@@ -140,13 +164,19 @@ export default function TravelPlanForm({
         {/* Start location / Destination – samo ako NISU zaključani (tj. na Create) */}
         {!isLocked("start_location") && (
           <div className="col-md-6">
-            <FormInput
+            <SelectInput
               id="start_location"
               name="start_location"
               label="Start location"
-              placeholder="e.g., Belgrade"
               value={form.start_location}
-              onChange={onChange}
+              onChange={(e) =>
+                setForm((f) => ({ ...f, start_location: e.target.value }))
+              }
+              options={(lists.startLocations || []).map((v) => ({
+                value: v,
+                label: v,
+              }))}
+              placeholder="Select start location"
               error={fieldErrors.start_location}
               required
             />
@@ -156,6 +186,7 @@ export default function TravelPlanForm({
           <div className="col-md-6">
             <SelectInput
               id="destination"
+              name="destination"
               label="Destination"
               value={form.destination}
               onChange={(e) =>

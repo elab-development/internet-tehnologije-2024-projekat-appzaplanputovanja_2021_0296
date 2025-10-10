@@ -15,7 +15,7 @@ class PlanItemResource extends JsonResource
     public function toArray(Request $request): array
     {
         return [
-            //'id'             => $this->id,
+            'id'             => $this->id,
             //'travel_plan_id' => $this->travel_plan_id,
             //'activity_id'    => $this->activity_id,
             'name'           => $this->name,

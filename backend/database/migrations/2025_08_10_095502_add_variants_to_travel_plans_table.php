@@ -12,7 +12,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('travel_plans', function (Blueprint $table) {
-            $table->enum('transport_mode', [ 'airplane', 'train', 'car', 'bus', 'ferry','cruise ship']);
+            $table->enum('transport_mode', [ 'airplane', 'train', 'car', 'bus']);
             $table->enum('accommodation_class', ['hostel','guesthouse','budget_hotel','standard_hotel','boutique_hotel','luxury_hotel',
                                                 'resort','apartment','bed_and_breakfast','villa','mountain_lodge','camping','glamping']);
         });

@@ -12,13 +12,11 @@ class UserSeeder extends Seeder
         //generiši 3 random korisnika
         //User::factory()->count(3)->create();
 
-        //3 poznata naloga
-        User::factory()->create([
-            'name' => 'Admin',
-            'email' => 'admin@example.com',
-            'password' => 'admin123', // biće hešovano
-            'is_admin' => true,
-        ]);
+        
+        User::firstOrCreate(
+            ['email' => 'admin@example.com'],
+            ['name'=>'Admin', 'password'=>'admin123', 'is_admin'=>true]
+        );
         User::factory()->create([
             'name' => 'Masa',
             'email' => 'masaljekocevic@gmail.com',
@@ -27,7 +25,12 @@ class UserSeeder extends Seeder
         User::factory()->create([
             'name' => 'Tasa',
             'email' => 'tamaralukovic@gmail.com',
-            'password' => 'tasa456',
+            'password' => 'tasa123',
+        ]);
+        User::factory()->create([
+            'name' => 'Stefan',
+            'email' => 'stefan@gmail.com',
+            'password' => 'stefan123',
         ]);
     }
 }
