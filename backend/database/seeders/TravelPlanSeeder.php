@@ -4,12 +4,14 @@ namespace Database\Seeders;
 
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Carbon;
+use Carbon\Carbon;
 use App\Models\User;
 use App\Models\Activity;
 use App\Models\TravelPlan;
 use App\Models\PlanItem;
 use App\Models\Setting;
+use App\Services\TravelPlanStoreService;
+use Symfony\Component\HttpKernel\Exception\HttpException;
 
 class TravelPlanSeeder extends Seeder
 {
@@ -20,148 +22,148 @@ class TravelPlanSeeder extends Seeder
             $users = User::factory()->count(2)->create();
         }
 
-        $locations = Activity::query()->distinct()->pluck('location')->toArray();
-        if (empty($locations)) {
-            $this->command->warn('No activities found. Run ActivitySeeder first.');
-            return;
+       $destinations = Activity::query()->distinct()->pluck('location')->toArray();
+        $startLocations = Activity::query()
+            ->where('type','Transport')
+            ->whereNotNull('start_location')
+            ->distinct()->pluck('start_location')->toArray();
+
+        $svc = app(TravelPlanStoreService::class);
+
+        // UZMI LISTU SVIH POSTOJEĆIH TRANSPORT RUTA (sa modom)
+        $routes = Activity::query()
+            ->where('type', 'Transport')
+            ->whereNotNull('start_location')
+            ->whereNotNull('location')
+            ->whereNotNull('transport_mode')
+            ->get(['start_location','location','transport_mode'])
+            ->unique(fn($r) => $r->start_location.'|'.$r->location.'|'.$r->transport_mode)
+            ->values();
+
+        if ($routes->isEmpty()) {
+            throw new \RuntimeException('No transport routes seeded. Ensure ActivitySeeder creates both directions.');
         }
 
-        $startLocations = ['Belgrade','Ljubljana','Zagreb','Sarajevo','Novi Sad','Niš'];
+        foreach (range(1, rand(8,12)) as $i) {
+            $user = $users->random();
 
-        foreach ($users as $user) {
-            $destination = collect($locations)->random();
+            // 1) IZABERI REALNU RUTU KOJA POSTOJI
+            $route = $routes->random();
+            $startLocation = $route->start_location;
+            $destination   = $route->location;
+            $mode          = $route->transport_mode;
 
-            $modes = Activity::where('type','Transport')->where('location',$destination)
-                ->distinct()->pluck('transport_mode')->filter()->values()->all();
-            $accs  = Activity::where('type','Accommodation')->where('location',$destination)
-                ->distinct()->pluck('accommodation_class')->filter()->values()->all();
-            if (empty($modes) || empty($accs)) {
+            // 2) PROVERI DA LI POSTOJE OBE CENE (skuplja i jeftinija) za istu rutu i mode
+            $count = Activity::query()
+                ->where('type','Transport')
+                ->where('start_location', $startLocation)
+                ->where('location', $destination)
+                ->where('transport_mode', $mode)
+                ->count();
+
+            if ($count < 2) {
+                // ako nema oba zapisa (outbound + return), preskoči kombinaciju
+                $i--;
+                continue;
+            }
+            // 3) UZMI POSTOJEĆU SMEŠTAJNU KLASU ZA TU DESTINACIJU
+            $accClass = Activity::query()
+                ->where('type','Accommodation')
+                ->where('location', $destination)
+                ->whereNotNull('accommodation_class')
+                ->inRandomOrder()
+                ->value('accommodation_class');
+
+            if (!$accClass) {
+                // nema smeštaja u toj destinaciji – probaj drugi route
+                $i--;
                 continue;
             }
 
-            $transportMode = collect($modes)->random();
-            $accClass      = collect($accs)->random();
-
-            $start = Carbon::now()->addDays(rand(15, 60))->startOfDay();
-            $end   = (clone $start)->addDays(rand(3, 5));
-
+            // 4) OSTALE VREDNOSTI
             $prefsAll = Activity::availablePreferenceTypes();
             shuffle($prefsAll);
-            $prefs = array_slice($prefsAll, 0, rand(4, 6));
+            $prefs = array_slice($prefsAll, 0, rand(2,5));
 
-            $plan = TravelPlan::factory()->make([
+            $passengers = rand(2,4);
+            $startDate = now()->addDays(rand(10,90))->startOfDay()->toDateString();
+            $endDate   = now()->parse($startDate)->addDays(rand(2,4))->toDateString();
+            $days      = Carbon::parse($endDate)->diffInDays($startDate);
+            $nights = max(1, (int)$days);
+                        
+            // Izračunaj minimalne obavezne troškove da ih uklopis u budzet
+            $outbound = Activity::where('type','Transport')
+                ->where('start_location', $startLocation)
+                ->where('location', $destination)
+                ->where('transport_mode', $mode)
+                ->orderBy('price','desc')
+                ->first();
+
+            $return = Activity::where('type','Transport')
+                ->where('start_location', $startLocation)
+                ->where('location', $destination)
+                ->where('transport_mode', $mode)
+                ->orderBy('price','asc')
+                ->first();
+
+            $accommodation = Activity::where('type','Accommodation')
+                ->where('location', $destination)
+                ->where('accommodation_class', $accClass)
+                ->orderBy('price','asc')
+                ->first();
+
+             // Sigurnosne vrednosti (ako iz seedera neka cena dođe null)
+            $tpOut  = (int) max(0, (int) ($outbound->price ?? 0));
+            $tpRet  = (int) max(0, (int) ($return->price ?? 0));
+            $accP   = (int) max(0, (int) ($accommodation->price ?? 0));
+
+            // Minimalni trošak za sve putnike
+            $mandatory = ($tpOut + $tpRet + ($accP * $nights) ) * $passengers;
+
+            // Dodaj realan dnevni budžet (60–120$ po osobi)
+            // Više dnevnog budžeta po osobi + dodatna rezerva za iskustva
+            $perDayPerPerson   = rand(100, 120); 
+            $variablePart      = $perDayPerPerson * $passengers * max(1, $days);
+
+            // Rezerva nezavisna od obaveznih (npr. ulaznice, ture…)
+            $experienceReserve = rand(40, 90) * $passengers * max(1, $days);
+
+            // preko svega  jos 20–30%
+            $marginFactor = [1.20, 1.25, 1.30][array_rand([1,2,3])];
+
+            // Konačni budžet: obavezno + dnevno + rezerva, pa margina
+            $budget = (int) ceil(($mandatory + $variablePart + $experienceReserve) * $marginFactor);
+
+            $minAllowed = max($mandatory, 100);  // barem mandatory, i barem 100
+            if ($budget < $minAllowed) {
+                $budget = (int) ceil($minAllowed * 1.10); // malo iznad minimuma
+            }
+
+            // 5) PROSLEDI SERVISU (KOJI KREIRA 3 OBAVEZNE + OSTALO)
+            $payload = [
                 'user_id'             => $user->id,
-                'start_location'      => collect($startLocations)->random(),
+                'start_location'      => $startLocation,
                 'destination'         => $destination,
-                'start_date'          => $start->toDateString(),
-                'end_date'            => $end->toDateString(),
-                'budget'              => rand(1200, 3000),
-                'passenger_count'     => rand(1, 4),
+                'start_date'          => $startDate,
+                'end_date'            => $endDate,
+                'budget'              => $budget,
+                'passenger_count'     => $passengers,
                 'preferences'         => $prefs,
-                'total_cost'          => 0,
-                'transport_mode'      => $transportMode,
+                'transport_mode'      => $mode,
                 'accommodation_class' => $accClass,
-            ]);
+            ];
 
-            DB::transaction(function () use ($plan) {
-                $plan->save();
+            try {
+                $svc->createWithGeneratedItems($payload);
+            } catch (HttpException $e) {
+                if ($e->getStatusCode() === 422) {
+                    $payload['budget'] = (int) ceil($payload['budget'] * 1.25);
+                    $svc->createWithGeneratedItems($payload);
+                } else {
+                    throw $e;
+                }
+            }
 
-                // Settings (fallback ako nema zapisa)
-                $outboundStart  = Setting::getValue('outbound_start', '08:00');
-                $checkinTime    = Setting::getValue('checkin_time',   '14:00');
-                $checkoutTime   = Setting::getValue('checkout_time',  '09:00');
-                $returnStart    = Setting::getValue('return_start',   '15:00');
-
-                $settings = (object)[
-                    'outbound_start' => $outboundStart,
-                    'checkin_time'   => $checkinTime,
-                    'checkout_time'  => $checkoutTime,
-                    'return_start'   => $returnStart,
-                ];
-
-                // === OBAVEZNE STAVKE (bez budžet filtera; force=true) ===
-                $this->attachMandatoryItems($plan, $settings);
-            });
         }
-    }
-
-    // --- obavezne stavke izdvojene kao METODA na nivou KLASE ---
-    private function attachMandatoryItems(TravelPlan $plan, $settings): void
-    {
-        // 1) OUT transport
-        $outName = "Transport {$plan->start_location} → {$plan->destination} ({$plan->transport_mode})";
-        $out = Activity::firstOrCreate([
-            'type'           => 'Transport',
-            'location'       => $plan->destination,
-            'transport_mode' => $plan->transport_mode,
-            'name'           => $outName,
-        ], [
-            'price' => 80, 'duration' => 120,
-            'preference_types' => $plan->preferences ?? [],
-        ]);
-
-        // 2) RETURN transport
-        $retName = "Transport {$plan->destination} → {$plan->start_location} ({$plan->transport_mode})";
-        $ret = Activity::firstOrCreate([
-            'type'           => 'Transport',
-            'location'       => $plan->destination,
-            'transport_mode' => $plan->transport_mode,
-            'name'           => $retName,
-        ], [
-            'price' => 80, 'duration' => 120,
-            'preference_types' => $plan->preferences ?? [],
-        ]);
-
-        // 3) ACCOMMODATION
-        $accName = "Accommodation in {$plan->destination} ({$plan->accommodation_class})";
-        $acc = Activity::firstOrCreate([
-            'type'                => 'Accommodation',
-            'location'            => $plan->destination,
-            'accommodation_class' => $plan->accommodation_class,
-            'name'                => $accName,
-        ], [
-            'price' => 65, 'duration' => 24*60,
-            'preference_types' => $plan->preferences ?? [],
-        ]);
-
-        // vremena
-        $outTime = Carbon::parse(($plan->start_date).' '.($settings->outbound_start ?? '08:00'));
-        $retTime = Carbon::parse(($plan->end_date).' '.($settings->return_start   ?? '15:00'));
-        $checkin = Carbon::parse(($plan->start_date).' '.($settings->checkin_time ?? '14:00'));
-        $checkout= Carbon::parse(($plan->end_date).' '.($settings->checkout_time  ?? '10:00'));
-
-        // force = true  -> ignoriše budžetski cutoff za obavezne
-        $this->attachItem($plan, $out, $outTime, (clone $outTime)->addMinutes($out->duration), $outName, true);
-        $this->attachItem($plan, $acc, $checkin, $checkout, $accName, true);
-        $this->attachItem($plan, $ret, $retTime, (clone $retTime)->addMinutes($ret->duration), $retName, true);
-    }
-
-    // --- amount pravilno (smeštaj = cena * broj noći), + opcioni $force ---
-    private function attachItem(TravelPlan $plan, Activity $activity, Carbon $from, Carbon $to, string $name, bool $force = false): void
-    {
-        // obračun iznosa
-        if ($activity->type === 'Accommodation') {
-            $nights = max(1, Carbon::parse($plan->end_date)->diffInDays(Carbon::parse($plan->start_date)));
-            $amount = $activity->price * $nights; // po noćenju
-        } else {
-            $amount = $activity->price * $plan->passenger_count; // transport i ostalo po osobi
-        }
-
-        // budžet filter samo ako NIJE force
-        if (!$force && ($plan->total_cost + $amount > $plan->budget)) {
-            return;
-        }
-
-        PlanItem::create([
-            'travel_plan_id' => $plan->id,
-            'activity_id'    => $activity->id,
-            'name'           => $name,
-            'time_from'      => $from,
-            'time_to'        => $to,
-            'amount'         => $amount,
-        ]);
-
-        $plan->increment('total_cost', $amount);
     }
 }
-

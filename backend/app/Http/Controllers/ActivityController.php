@@ -68,25 +68,25 @@ class ActivityController extends Controller
     public function store(Request $request)
     {
         $data = $request->validate([
-            'type'               => ['required',
-                                Rule::in(['Transport','Accommodation','Food&Drink','Culture&Sightseeing',
-                                'Shopping&Souvenirs','Nature&Adventure','Relaxation&Wellness',
-                                'Family-Friendly','Educational&Volunteering','Entertainment&Leisure','other'])],    
+            'type'               => ['required', Rule::in(Activity::availableTypes())],
+            'location'           => ['required', Rule::in(Activity::availableLocations())],
+            'preference_types'   => ['required','array'],
+            'preference_types.*' => [Rule::in(Activity::availablePreferenceTypes())],
+
+            'transport_mode'     => [ 'required_if:type,Transport','prohibited_unless:type,Transport',
+                                        Rule::in(Activity::availableTransportModes())
+                                    ],
+            'accommodation_class'=> ['required_if:type,Accommodation','prohibited_unless:type,Accommodation',
+                                        Rule::in(Activity::availableAccommodationClasses())
+                                    ],       
+            'start_location'     => ['required_if:type,Transport','prohibited_unless:type,Transport',
+                                        Rule::in(Activity::availableStartLocations())
+                                    ],   
             'name'               => 'required|string|max:255',
             'price'              => 'required|numeric|min:0',
             'duration'           => 'required|integer|min:0',
-            'location'           => 'required|string|max:255',
             'content'            => 'nullable|string',
-            'preference_types'   => 'required|array',
-            // Za validaciju svakog elementa preference_types niza:
-            'preference_types.*' => [   
-                                    Rule::in(Activity::availablePreferenceTypes()), ],
             'image_url'          => 'nullable|url|max:2048',
-            'transport_mode'     => ['required_if:type,Transport','prohibited_unless:type,Transport',
-                                     Rule::in(['airplane','train','car','bus'])],
-            'accommodation_class'=> ['required_if:type,Accommodation','prohibited_unless:type,Accommodation',
-                                    Rule::in(['hostel','guesthouse','budget_hotel','standard_hotel','boutique_hotel','luxury_hotel',
-                                    'resort','apartment','bed_and_breakfast','villa','mountain_lodge','camping','glamping'])],
         ]);
 
         $activity = Activity::create($data);

@@ -107,7 +107,7 @@ class ActivitySeeder extends Seeder
             ],
         ];
 
-        // 3) FREE AKTIVNOSTI 
+        // 3) SLOBODNE  AKTIVNOSTI 
         $activityImages = [
             'Food&Drink' => [
                 $this->img('/activity-images/Food&Drink1.jpg'),
@@ -148,79 +148,108 @@ class ActivitySeeder extends Seeder
             'Valencia'  => $this->img('/activity-images/Culture&SightseeingValencia.jpg'),
         ];
 
-        foreach ($startLocations as $from) {
-            foreach ($locations as $to) {
+       foreach ($startLocations as $start) {
+            foreach ($locations as $dest) {
+                if ($start === $dest) continue;
+
                 foreach ($transportModes as $mode) {
-                    $imgPool = $transportImagesByMode[$mode] ?? [];
+                    $imgs = $transportImagesByMode[$mode] ?? [];
+                    $img  = $imgs ? $imgs[array_rand($imgs)] : null;
 
-                    // Odlazak
-                    Activity::create([
-                        'type'            => 'Transport',
-                        'name'            => "Transport {$from} → {$to} ({$mode})",
-                        'location'        => $to,
-                        'transport_mode'  => $mode,
-                        'price'           => fake()->numberBetween(20, 140),
-                        'duration'        => fake()->numberBetween(60, 360),
-                        'preference_types'=> ['comfortable_travel'],
-                        'image_url'       => $imgPool ? fake()->randomElement($imgPool) : null,
-                    ]);
+                    // bazna cena za par
+                    $base = fake()->numberBetween(40, 180);
 
-                    // Povratak
-                    Activity::create([
-                        'type'            => 'Transport',
-                        'name'            => "Transport {$to} → {$from} ({$mode})",
-                        'location'        => $to,
-                        'transport_mode'  => $mode,
-                        'price'           => fake()->numberBetween(20, 140),
-                        'duration'        => fake()->numberBetween(60, 360),
-                        'preference_types'=> ['comfortable_travel'],
-                        'image_url'       => $imgPool ? fake()->randomElement($imgPool) : null,
-                    ]);
+                    // 1) OUTBOUND: skuplji
+                    Activity::factory()
+                        ->transport($mode, $start)   // setuje start_location
+                        ->forLocation($dest)         // setuje location
+                        ->state([
+                        'name'      => "Transport {$start} → {$dest} ({$mode})",
+                        'price'     => (int) round($base * 1.15), // skuplji
+                        'image_url' => $img,
+                        ])->create();
+
+                    // 2) RETURN: jeftiniji (polja OSTAJU ista!)
+                    Activity::factory()
+                        ->transport($mode, $start)
+                        ->forLocation($dest)
+                        ->state([
+                        'name'      => "Transport {$dest} → {$start} ({$mode})",
+                        'price'     => $base, // jeftiniji
+                        'image_url' => $img,
+                        ])->create();
                 }
             }
         }
 
 
-        // Smeštaj
+        // 2) SMEŠTAJ: za svaku destinaciju i klasу
         foreach ($locations as $loc) {
             foreach ($accClasses as $cls) {
-                $imgPool = $accommodationImages[$cls] ?? [];
-                Activity::create([
-                    'type'                 => 'Accommodation',
-                    'name'                 => "Accommodation in {$loc} ({$cls})",
-                    'location'             => $loc,
-                    'transport_mode'       => null,
-                    'accommodation_class'  => $cls,
-                    'price'                => fake()->numberBetween(20, 80),
-                    'duration'             => 24 * 60,
-                    'preference_types'     => ['comfortable_travel'],
-                    'image_url'            => $imgPool ? fake()->randomElement($imgPool) : null,
-                ]);
+                $imgs = $accommodationImages[$cls] ?? [];
+                Activity::factory()
+                    ->accommodation($cls)
+                    ->forLocation($loc)
+                    ->state([
+                        'name'      => "Accommodation in $loc ($cls)",
+                        'image_url' => $imgs ? $imgs[array_rand($imgs)] : null,
+                    ])->create();
             }
         }
 
-        // Slobodne aktivnosti
-        foreach ($locations as $loc) {
+         foreach ($locations as $loc) {
             foreach ($freeTypes as $t) {
-                Activity::factory()
-                    ->count(5)
-                    ->state(function () use ($loc, $t, $activityImages, $cultureImagesByLocation) {
-                        $img = $activityImages[$t] ?? null;
-                        $img = is_array($img) ? fake()->randomElement($img) : null;
-                        // ako je Culture&Sightseeing – uzmi TAČNO sliku za lokaciju (ako postoji)
-                        if ($t === 'Culture&Sightseeing' && isset($cultureImagesByLocation[$loc])) {
-                            $img = $cultureImagesByLocation[$loc];
+                for ($i = 0; $i < 5; $i++) {
+                    // --- IZBOR SLIKE ---
+                    $img = null;
+
+                    if ($t === 'Culture&Sightseeing' && isset($cultureImagesByLocation[$loc])) {
+                        // Culture&Sightseeing: fiksno po lokaciji
+                        $img = $cultureImagesByLocation[$loc];
+                    } else {
+                        // Ostali tipovi: round-robin kroz liste slika
+                        $imgs = $activityImages[$t] ?? [];
+                        if (!empty($imgs)) {
+                            // Za sve ostale tipove aktivnosti (osim Culture&Sightseeing):
+                            // prolazi redom kroz dostupne slike tog tipa (round-robin),
+                            // a pomoću offseta (crc32 lokacije) svaka lokacija počinje od druge slike
+                            $offset = count($imgs) ? (crc32($loc) % count($imgs)) : 0;
+                            $img = $imgs[($i + $offset) % count($imgs)];
                         }
-                        return [
-                            'type'       => $t,
-                            'location'   => $loc,
-                            'image_url'  => $img,
-                            'transport_mode' => null,
-                            'accommodation_class' => null,
-                        ];
-                    })
-                    ->create();
+                    }
+
+                    // --- CENA PO TIPU ---
+                    // Nature & Culture oko 0; za ostale tipove okvirne realne vrednosti
+                    $price = match ($t) {
+                        'Culture&Sightseeing' => (rand(1,10) <= 3) ? 0 : rand(5, 20),   // ~30% free, inače 5–20
+                        'Nature&Adventure'    => (rand(1,10) <= 3) ? 0 : rand(10, 30),  // ~30% free, inače 10–30
+                        'Shopping&Souvenirs'   => rand(15, 60),
+                        'Relaxation&Wellness'  => rand(10, 40),
+                        'Food&Drink'           => rand(8, 35),
+                        default                => rand(5, 40),
+                    };
+
+                    // --- TRAJANJE (free kraće, da ne “pojedu” dan) ---
+                    $duration = match ($t) {
+                        'Culture&Sightseeing' => rand(45, 90),
+                        'Nature&Adventure'    => rand(60, 100),
+                        default               => rand(60, 180),
+                    };
+                    Activity::factory()
+                    ->typed($t)
+                    ->forLocation($loc)
+                    ->state([
+                        // sufiks #1..#5 da se nazivi razlikuju vizuelno
+                        'name'                => "$t in $loc #" . ($i + 1),
+                        'image_url'           => $img,
+                        'transport_mode'      => null,
+                        'accommodation_class' => null,
+                        'price'               => $price,
+                        'duration'            => $duration,
+                    ])->create();
+                    }
+            
             }
         }
-    }
+}
 }
