@@ -21,6 +21,10 @@ class ActivityResource extends JsonResource
             'price'               => (float) $this->price,
             'duration'            => (int) $this->duration, // minuti
             'location'            => $this->location,
+            'start_location'     => $this->when(
+                $this->type === 'Transport' && !is_null($this->start_location),
+                $this->start_location
+            ),
 
             //mergeWhen-dodaje vise polja odjednom ako je uslov ispunjen
             $this->mergeWhen(!is_null($this->content), ['content' => $this->content,]),

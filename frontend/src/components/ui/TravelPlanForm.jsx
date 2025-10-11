@@ -7,7 +7,6 @@ import PrimaryButton from "../ui/PrimaryButton";
 
 /**
  * Reusable forma za kreiranje/izmene Travel plana.
- * Sav vidljivi tekst je na ENGLESKOM; komentari su na SRPSKOM.
  *
  * Props:
  * - mode: "create" | "edit"

@@ -69,6 +69,16 @@ class TravelPlanUpdateService
             // ima prostora – dodaj do približno budžetu
             $this->expandTowardBudget($plan);
         }
+        // Ako smo povećali pax i budžet ‘puca’, proba shrink pa abort
+        if ($plan->total_cost > $plan->budget) {
+            $this->shrinkToBudget($plan);
+            $plan->refresh();
+            if ($plan->total_cost > $plan->budget) {
+                abort(422, 'Increasing passenger count exceeds the budget even after rebalancing.');
+            }
+        }
+
+        $this->assertMandatoryItems($plan);
     }
 
     /**
@@ -82,6 +92,8 @@ class TravelPlanUpdateService
         } else {
             $this->expandTowardBudget($plan);
         }
+        $plan->refresh();
+        $this->assertMandatoryItems($plan);
     }
 
     /**
@@ -122,46 +134,72 @@ class TravelPlanUpdateService
     }
 
     private function mandatoryCostFloor(TravelPlan $plan): float
-        {
-            $transport = Activity::where('type','Transport')
-                ->where('location', $plan->destination)
-                ->where('transport_mode', $plan->transport_mode)
-                ->orderBy('price')->first();
+    {
+        // outbound: skuplji
+        $outboundT = Activity::where('type','Transport')
+        ->where('start_location', $plan->start_location)
+        ->where('location', $plan->destination)
+        ->where('transport_mode', $plan->transport_mode)
+        ->orderBy('price','desc') // skuplji
+        ->first();
 
-            $accommodation = Activity::where('type','Accommodation')
-                ->where('location', $plan->destination)
-                ->where('accommodation_class', $plan->accommodation_class)
-                ->orderBy('price')->first();
+        // return: jeftiniji
+        $returnT = Activity::where('type','Transport')
+        ->where('start_location', $plan->start_location)
+        ->where('location', $plan->destination)
+        ->where('transport_mode', $plan->transport_mode)
+        ->orderBy('price','asc') // jeftiniji
+        ->first();
 
-            if (!$transport || !$accommodation) {
-                abort(422, 'No transport/accommodation variants for the selected destination/class.');
-            }
+        // accommodation
+        $accommodation = Activity::where('type', 'Accommodation')
+            ->where('location', $plan->destination)
+            ->where('accommodation_class', $plan->accommodation_class)
+            ->whereNotNull('price')
+            ->orderBy('price', 'asc')
+            ->first();
 
-            return (($transport->price * 2) + $accommodation->price) * $plan->passenger_count;
+        if (!$outboundT || !$returnT || !$accommodation) {
+            abort(422, 'No matching transport/accommodation variants for selected start/destination/mode/class.');
         }
+
+        return floatval(($outboundT->price + $returnT->price + $accommodation->price) * $plan->passenger_count);
+    }
 
     private function upsertMandatoryItems(TravelPlan $plan, array $cfg): void
     {
-        $transport = Activity::where('type','Transport')
-            ->where('location', $plan->destination)
-            ->where('transport_mode', $plan->transport_mode)
-            ->orderBy('price')->first();
+       // outbound: skuplji
+        $outboundT = Activity::where('type','Transport')
+        ->where('start_location', $plan->start_location)
+        ->where('location', $plan->destination)
+        ->where('transport_mode', $plan->transport_mode)
+        ->orderBy('price','desc') // skuplji
+        ->first();
+
+        // return: jeftiniji
+        $returnT = Activity::where('type','Transport')
+        ->where('start_location', $plan->start_location)
+        ->where('location', $plan->destination)
+        ->where('transport_mode', $plan->transport_mode)
+        ->orderBy('price','asc') // jeftiniji
+        ->first();
 
         $accommodation = Activity::where('type','Accommodation')
             ->where('location', $plan->destination)
             ->where('accommodation_class', $plan->accommodation_class)
+            ->whereNotNull('price')
             ->orderBy('price')->first();
 
         // outbound
         $depFrom = Carbon::parse(Carbon::parse($plan->start_date)->toDateString().' '.$cfg['outboundStart']);
-        $depTo   = (clone $depFrom)->addMinutes($transport->duration);
+        $depTo = (clone $depFrom)->addMinutes((int)$outboundT->duration);
         $this->upsertSingleMandatory(
-            $plan,
-            'Transport',
+            $plan, 'Transport',
             fn($pi) => Carbon::parse($pi->time_from)->isSameDay($plan->start_date),
             "Transport {$plan->start_location} → {$plan->destination} ({$plan->transport_mode})",
-            $transport, $depFrom, $depTo
+            $outboundT, $depFrom, $depTo
         );
+
 
         // accommodation
         $accFrom = Carbon::parse(Carbon::parse($plan->start_date)->toDateString().' '.$cfg['checkinTime']);
@@ -176,13 +214,12 @@ class TravelPlanUpdateService
 
         // return
         $retFrom = Carbon::parse(Carbon::parse($plan->end_date)->toDateString().' '.$cfg['returnStart']);
-        $retTo   = (clone $retFrom)->addMinutes($transport->duration);
+        $retTo = (clone $retFrom)->addMinutes((int)$returnT->duration);
         $this->upsertSingleMandatory(
-            $plan,
-            'Transport',
+            $plan, 'Transport',
             fn($pi) => Carbon::parse($pi->time_from)->isSameDay($plan->end_date),
             "Transport {$plan->destination} → {$plan->start_location} ({$plan->transport_mode})",
-            $transport, $retFrom, $retTo
+            $returnT, $retFrom, $retTo
         );
     }
 
@@ -318,14 +355,31 @@ class TravelPlanUpdateService
         }
         if ($start->gte($end)) return;
 
-        $cands = $this->candidateActivities($plan);
-        foreach ($cands as $a) {
-            $slot = $this->findSlot($plan->id, $start, $end, (int)$a->duration, $cfg['gapBetweenItemsMin']);
+        // Kandidati + split paid/free
+        $cands = $this->candidateActivities($plan)->values();
+        $paid  = $cands->filter(fn($a) => (int)$a->price > 0)->sortBy('price')->values();
+        $free  = $cands->filter(fn($a) => (int)$a->price === 0)->values();
+
+        // Limiti FREE
+        $maxFreePerPlan = 2;
+        $freeUsedPlan   = $plan->planItems()
+            ->whereHas('activity', fn($q) => $q->whereNotIn('type', ['Transport','Accommodation']))
+            ->get()
+            ->filter(fn($pi) => (int)optional($pi->activity)->price === 0)
+            ->count();
+
+        $maxFreePerDay = 1;
+        $freeUsedDay   = 0;
+
+        // 1) PLAĆENE
+        foreach ($paid as $a) {
+            $amount = (int)$a->price * (int)$plan->passenger_count;
+            if ((float)$plan->total_cost + $amount > (float)$plan->budget) continue;
+
+            $slot = $this->findSlot($plan->id, $start, $end, (int)$a->duration, (int)$cfg['gapBetweenItemsMin']);
             if (!$slot) continue;
             [$from,$to] = $slot;
 
-            $amount = $a->price * $plan->passenger_count;
-            if ($plan->total_cost + $amount > $plan->budget) continue;
             if ($return && $to->gt(Carbon::parse($return->time_from))) continue;
 
             PlanItem::create([
@@ -339,9 +393,34 @@ class TravelPlanUpdateService
             $plan->increment('total_cost', $amount);
             $plan->refresh();
 
-            if ($this->closeToBudget($plan)) break;
+            // posle prve uspešne – prekini za taj dan; ili ukloni `break` ako želiš više
+            break;
+        }
+
+        // 2) FREE (ako ima mesta i nismo prešli limite)
+        if ($freeUsedPlan < $maxFreePerPlan && $freeUsedDay < $maxFreePerDay) {
+            foreach ($free as $a) {
+                $slot = $this->findSlot($plan->id, $start, $end, (int)$a->duration, (int)$cfg['gapBetweenItemsMin']);
+                if (!$slot) continue;
+                [$from,$to] = $slot;
+
+                if ($return && $to->gt(Carbon::parse($return->time_from))) continue;
+
+                PlanItem::create([
+                    'travel_plan_id' => $plan->id,
+                    'activity_id'    => $a->id,
+                    'name'           => $a->name,
+                    'time_from'      => $from,
+                    'time_to'        => $to,
+                    'amount'         => 0,
+                ]);
+                $plan->refresh();
+                // posle jedne free – dosta za taj dan (možeš ukloniti break ako želiš 2+)
+                break;
+            }
         }
     }
+
 
     private function shrinkToBudget(TravelPlan $plan): void
     {
@@ -364,18 +443,33 @@ class TravelPlanUpdateService
     {
         if ($this->closeToBudget($plan)) return;
 
-        $gaps  = $this->freeTimeWindows($plan);
-        $cands = $this->candidateActivities($plan)
-            ->map(fn($a) => ['activity'=>$a, 'score'=>$this->utilityScore($plan, $a)])
-            ->sortBy([['score','desc'], ['activity.price','asc']])->values();
+        // Kandidati + split paid/free
+        $cands = $this->candidateActivities($plan)->values();
+        $paid  = $cands->filter(fn($a) => (int)$a->price > 0)
+                    ->sortBy('price')      // jeftinije prvo
+                    ->values();
 
-        foreach ($cands as $row) {
-            $a = $row['activity'];
-            $amount = $a->price * $plan->passenger_count;
-            if ($plan->total_cost + $amount > $plan->budget) continue;
+        $free  = $cands->filter(fn($a) => (int)$a->price === 0)->values();
+
+        // Limiti FREE (globalno po planu)
+        $maxFreePerPlan = 2;
+        $freeUsedPlan   = $plan->planItems()
+            ->whereHas('activity', fn($q) => $q->whereNotIn('type', ['Transport','Accommodation']))
+            ->get()
+            ->filter(fn($pi) => (int)optional($pi->activity)->price === 0)
+            ->count();
+
+        // Slobodni prozori
+        $gaps = $this->freeTimeWindows($plan);
+
+        // 1) PLAĆENE dok ne priđemo budžetu
+        foreach ($paid as $a) {
+            $amount = (int)$a->price * (int)$plan->passenger_count;
+            if ((float)$plan->total_cost + $amount > (float)$plan->budget) continue;
 
             $slot = $this->findFirstFittingSlotFromGaps($gaps, (int)$a->duration);
             if (!$slot) continue;
+
             [$from,$to] = $slot;
 
             PlanItem::create([
@@ -391,7 +485,27 @@ class TravelPlanUpdateService
 
             $gaps = $this->consumeGap($gaps, [$from,$to]);
 
-            if ($this->closeToBudget($plan)) break;
+            if ($this->closeToBudget($plan)) return;
+        }
+
+        // 2) FREE – popuni rupe bez obzira na budžet
+        foreach ($free as $a) {
+            if ($freeUsedPlan >= $maxFreePerPlan) break;
+            $slot = $this->findFirstFittingSlotFromGaps($gaps, (int)$a->duration);
+            if (!$slot) continue;
+            [$from,$to] = $slot;
+
+            PlanItem::create([
+                'travel_plan_id' => $plan->id,
+                'activity_id'    => $a->id,
+                'name'           => $a->name,
+                'time_from'      => $from,
+                'time_to'        => $to,
+                'amount'         => 0,
+            ]);
+            $plan->refresh();
+            $gaps = $this->consumeGap($gaps, [$from,$to]);
+            $freeUsedPlan++;
         }
     }
 
@@ -400,12 +514,12 @@ class TravelPlanUpdateService
     {
         $prefs = collect($plan->preferences ?? []);
         return Activity::where('location', $plan->destination)
-            ->whereNotIn('type', ['Transport','Accommodation'])
-            ->get()
-            ->filter(function(Activity $a) use ($prefs){
-                $ap = collect($a->preference_types ?? []);
-                return $prefs->isEmpty() ? true : $prefs->intersect($ap)->isNotEmpty();
-            })->values();
+                ->whereNotIn('type', ['Transport','Accommodation'])
+                ->get()
+                ->filter(function(Activity $a) use ($prefs){
+        $ap = collect($a->preference_types ?? []);
+        return $prefs->isEmpty() ? true : $prefs->intersect($ap)->isNotEmpty();
+                })->values();
     }
 
     private function nonMandatoryItems(TravelPlan $plan)

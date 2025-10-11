@@ -29,23 +29,39 @@ class TravelPlanStoreService
             $this->fillWithMatchingActivities($plan);
 
             $this->assertMandatoryItems($plan);
+
+            $this->syncTotalCost($plan);
             
             return $plan->fresh(['planItems.activity']);
         });
     }
 
-    private function assertMandatoryItems(TravelPlan $plan): void
+   private function assertMandatoryItems(TravelPlan $plan): void
     {
+        // mora biti tačno 2 transporta
         $transportCount = $plan->planItems()
             ->whereHas('activity', fn($q) => $q->where('type', 'Transport'))
             ->count();
 
-        $accommodationCount = $plan->planItems()
+        // i bar 1 smeštajna stavka
+        $accommodationItem = $plan->planItems()
             ->whereHas('activity', fn($q) => $q->where('type', 'Accommodation'))
-            ->count();
+            ->first();
 
-       if ($transportCount !== 2 || $accommodationCount < 1) {
+        if ($transportCount !== 2 || !$accommodationItem) {
             abort(422, 'Mandatory items missing. Increase budget or adjust dates.');
+        }
+
+        // smeštaj mora da pokriva ceo boravak (po Settings)
+        $checkin  = Setting::getValue('checkin_time', '14:00');
+        $checkout = Setting::getValue('checkout_time','09:00');
+
+        $shouldFrom = Carbon::parse($plan->start_date.' '.$checkin);
+        $shouldTo   = Carbon::parse($plan->end_date.' '.$checkout);
+
+        if (!Carbon::parse($accommodationItem->time_from)->equalTo($shouldFrom) ||
+            !Carbon::parse($accommodationItem->time_to)->equalTo($shouldTo)) {
+            abort(422, 'Accommodation must span the entire stay according to check-in/out settings.');
         }
     }
     /**
@@ -54,105 +70,141 @@ class TravelPlanStoreService
      */
     public function generateMandatoryItems(TravelPlan $plan): void
     {
-        // podrazumevana vremena- admin posle moze rucno menjati PlanItem
+        // Podrazumevana vremena (admin ih menja kroz Settings)
         $outboundStart = Setting::getValue('outbound_start', '08:00');
         $checkinTime   = Setting::getValue('checkin_time',   '14:00');
         $checkoutTime  = Setting::getValue('checkout_time',  '09:00');
         $returnStart   = Setting::getValue('return_start',   '15:00');
 
-        // Pronadji TRANSPORT varijantu (po enum transport_mode) 
-        $transport = Activity::where('type', 'Transport')
-            ->where('transport_mode', $plan->transport_mode)
-            ->orderBy('price')
-            ->first();
+        // 1) TRANSPORT: tačna ruta i mod
+        // OUTBOUND = skuplji
+        $outboundTransport = Activity::where('type','Transport')
+        ->where('transport_mode', $plan->transport_mode)
+        ->where('start_location', $plan->start_location)
+        ->where('location', $plan->destination)
+        ->orderBy('price', 'desc')
+        ->first();
 
-        // Pronadji ACCOMMODATION varijantu (po enum accommodation_class) za destinaciju
+        // RETURN = jeftiniji
+        $returnTransport = Activity::where('type','Transport')
+        ->where('transport_mode', $plan->transport_mode)
+        ->where('start_location', $plan->start_location)
+        ->where('location', $plan->destination)
+        ->orderBy('price', 'asc')
+        ->first();
+
+        // 2) ACCOMMODATION: tačna klasa u destinaciji
         $accommodation = Activity::where('type','Accommodation')
             ->where('location', $plan->destination)
             ->where('accommodation_class', $plan->accommodation_class)
-            ->orderBy('price')->first();
+            ->orderBy('price')
+            ->first();
 
-        if (!$transport || !$accommodation) {
-            abort(422, 'There are no activities for the selected transportation or accommodation at the selected location. 
-            Please select transportation and accommodation again.');
+        if (!$outboundTransport || !$returnTransport || !$accommodation) {
+            abort(422, 'There are no activities for the selected transportation routes or accommodation at the selected location.');
         }
-        $mandatoryTotal = (($transport->price * 2) + $accommodation->price) * $plan->passenger_count;
+
+        // 3) Provera budžeta za obavezne
+        $mandatoryTotal =
+            ($outboundTransport->price + $returnTransport->price + $accommodation->price)
+            * $plan->passenger_count;
+
         if ($mandatoryTotal > (float)$plan->budget) {
             abort(422, 'The budget does not cover mandatory transportation (both ways) and accommodation.');
         }
 
-        // Outbound
-        $from = Carbon::parse($plan->start_date.' '.$outboundStart);
-        $to   = (clone $from)->addMinutes($transport->duration);
-        $outboundTransport = clone $transport; //clon da bi sacuvala i return varijantu
-        $outboundTransport->name = "Transport {$plan->start_location} → {$plan->destination} ({$plan->transport_mode})";
-        $this->createMandatoryItemOrFail($plan, $outboundTransport, $from, $to);
+        // 4) Kreiranje 3 obavezne stavke, tačnim redosledom
 
-        // Accommodation – ceo boravak
+        // a) Outbound (start_date @ outboundStart)
+        $from = Carbon::parse($plan->start_date.' '.$outboundStart);
+        $to   = (clone $from)->addMinutes((int)$outboundTransport->duration);
+
+        // prilagodimo naziv da bude jasan u planu
+        $ob = clone $outboundTransport;
+        $ob->name = "Transport {$plan->start_location} → {$plan->destination} ({$plan->transport_mode})";
+
+        $this->createMandatoryItemOrFail($plan, $ob, $from, $to);
+
+        // b) Accommodation (od checkin do checkout)
         $accFrom = Carbon::parse($plan->start_date)->setTimeFromTimeString($checkinTime);
         $accTo   = Carbon::parse($plan->end_date)->setTimeFromTimeString($checkoutTime);
-        $accommodation->name = "Accommodation in {$plan->destination} ({$plan->accommodation_class})";
-        $this->createMandatoryItemOrFail(
-            $plan,
-            $accommodation,
-            $accFrom,
-            $accTo,
-            ignoreOverlap: true // ne računa se u overlap
-        );
 
-        // Return
+        $acc = clone $accommodation;
+        $acc->name = "Accommodation in {$plan->destination} ({$plan->accommodation_class})";
+
+        $this->createMandatoryItemOrFail($plan, $acc, $accFrom, $accTo, ignoreOverlap: true);
+
+        // c) Return (end_date @ returnStart)
         $retFrom = Carbon::parse($plan->end_date.' '.$returnStart);
-        $retTo   = (clone $retFrom)->addMinutes($transport->duration);
-        $returnTransport = clone $transport;
-        $returnTransport->name = "Transport {$plan->destination} → {$plan->start_location} ({$plan->transport_mode})";
-        $this->createMandatoryItemOrFail($plan, $returnTransport, $retFrom, $retTo);
+        $retTo   = (clone $retFrom)->addMinutes((int)$returnTransport->duration);
+
+        $ret = clone $returnTransport;
+        $ret->name = "Transport {$plan->destination} → {$plan->start_location} ({$plan->transport_mode})";
+
+        $this->createMandatoryItemOrFail($plan, $ret, $retFrom, $retTo);
     }
+
 
     /**
      * Punjenje plana aktivnostima koje se uklapaju (lokacija + prefs), bez overlapa i do budžeta.
      */
     public function fillWithMatchingActivities(TravelPlan $plan): void
     {
-        // Pročitaj podešavanja, uz fallback vrednosti
+        // Podešavanja
         $hasSetting = class_exists(Setting::class);
         $defaultDayStart = $hasSetting ? Setting::getValue('default_day_start', '09:00') : '09:00';
         $defaultDayEnd   = $hasSetting ? Setting::getValue('default_day_end',   '20:00') : '20:00';
         $bufferAfterOutboundMin = (int) ($hasSetting ? Setting::getValue('buffer_after_outbound_min', 30) : 30);
         $bufferBeforeReturnMin  = (int) ($hasSetting ? Setting::getValue('buffer_before_return_min', 0)  : 0);
 
+        // Cilj potrošnje (više prema budžetu)
+        $target = (int) floor((float)$plan->budget * 0.95);
+
         $start = Carbon::parse($plan->start_date);
         $end   = Carbon::parse($plan->end_date);
 
-        // Nađi TRANSPORT stavke (outbound/return) za određivanje dnevnih granica
+        // TRANSPORT stavke za granice prvog/poslednjeg dana
         $items = $plan->planItems()->with('activity')->get();
-
-        $outbound = $items->filter(fn($pi) =>
+        $outbound = $items->first(fn($pi) =>
             $pi->activity && $pi->activity->type === 'Transport' &&
             Carbon::parse($pi->time_from)->isSameDay($start)
-        )->sortBy('time_from')->first();
-
+        );
         $return = $items->filter(fn($pi) =>
             $pi->activity && $pi->activity->type === 'Transport' &&
             Carbon::parse($pi->time_from)->isSameDay($end)
         )->sortByDesc('time_from')->first();
 
-        //Pripremi kandidate: destinacija + poklapanje bar jedne preferencije, isključi Transport/Accommodation
+        // ---- DEFINIŠI $baseQuery (KANDIDATI) ----
         $prefs = collect($plan->preferences ?? []);
-        $candidates = Activity::where('location', $plan->destination)
+
+        // sve aktivnosti u destinaciji osim Transport/Accommodation
+        $allAtDestination = Activity::query()
+            ->where('location', $plan->destination)
             ->whereNotIn('type', ['Transport','Accommodation'])
-            ->get()
-            ->filter(function(Activity $a) use ($prefs) {
-                $ap = collect($a->preference_types ?? []);
-                return $prefs->isEmpty() ? true : $prefs->intersect($ap)->isNotEmpty();
-            })
-            ->sortBy('price') // jeftinije prvo – efikasnije punjenje budžeta
+            ->get();
+
+        // filtriraj po preferencama (ako postoje)
+        $baseQuery = $allAtDestination->filter(function (Activity $a) use ($prefs) {
+            if ($prefs->isEmpty()) return true;
+            $ap = collect($a->preference_types ?? []);
+            return $ap->isNotEmpty() && $prefs->intersect($ap)->isNotEmpty();
+        })->values();
+
+        // podeli na plaćene i besplatne
+        $candidatesPaid = $baseQuery->filter(fn($a) => (int)$a->price > 0)
+            ->sortByDesc('price') // skuplje prvo da brže priđemo cilju
             ->values();
 
-         //Iteriraj dane
+        $candidatesFree = $baseQuery->filter(fn($a) => (int)$a->price === 0)
+            ->values();
+
+        // Limiti za FREE
+        $maxFreePerPlan = 4;
+        $maxFreePerDay  = 2;
+
         $day = $start->copy();
         while ($day->lte($end)) {
-
-            // Odredi dnevni prozor
+            // dnevni prozor [dayStart, dayEnd]
             if ($day->isSameDay($start)) {
                 $dayStart = $outbound
                     ? Carbon::parse($outbound->time_to)->copy()->addMinutes($bufferAfterOutboundMin)
@@ -167,38 +219,62 @@ class TravelPlanStoreService
                 $dayStart = Carbon::parse($day->format('Y-m-d').' '.$defaultDayStart);
                 $dayEnd   = Carbon::parse($day->format('Y-m-d').' '.$defaultDayEnd);
             }
+            if ($dayStart->gte($dayEnd)) { $day->addDay(); continue; }
 
-            // ako je prozor izopačen (npr. povratak vrlo rano), preskoči dan
-            if ($dayStart->gte($dayEnd)) {
-                $day->addDay();
-                continue;
+            // Per-day brojač za free i globalni broj već ubačenih free
+            $maxFreePerPlanUsed = $plan->planItems()
+                ->whereHas('activity', fn($q) => $q->whereNotIn('type', ['Transport','Accommodation']))
+                ->get()
+                ->filter(fn($pi) => (int)optional($pi->activity)->price === 0)
+                ->count();
+
+            $freeUsedDay = 0;
+
+            // 1) PLAĆENE – do targeta budžeta
+            foreach ($candidatesPaid as $activity) {
+                if ((float)$plan->total_cost >= $target) break;
+
+                $slot = $this->findNextAvailableTimeSlot($plan, $dayStart, $dayEnd, (int)$activity->duration);
+                if (!$slot) continue;
+
+                [$from, $to] = $slot;
+                $created = $this->createItemIfBudgetAllows($plan, $activity, $from, $to);
+                if ($created && (float)$plan->total_cost >= $target) break;
             }
 
-            // Pokušaj da spakuješ aktivnosti u (prvu moguću) rupu tog dana
-            foreach ($candidates as $activity) {
+            // 2) FREE – popuni rupe bez obzira na budžet (uz limite)
+            if ($maxFreePerPlanUsed < $maxFreePerPlan) {
+                foreach ($candidatesFree as $activity) {
+                    if ($maxFreePerPlanUsed >= $maxFreePerPlan || $freeUsedDay >= $maxFreePerDay) break;
 
-                // nađi prvu slobodnu rupu u dnevnom prozoru za trajanje aktivnosti
-                $slot = $this->findNextAvailableTimeSlot(
-                    $plan,
-                    $dayStart,
-                    $dayEnd,
-                    (int) $activity->duration,
-                );
+                    $slot = $this->findNextAvailableTimeSlot($plan, $dayStart, $dayEnd, (int)$activity->duration);
+                    if (!$slot) continue;
 
-                if (!$slot) {
-                    continue; // nema mesta za ovu aktivnost tog dana – probaj sledeću
+                    [$from, $to] = $slot;
+
+                    // ako helper blokira amount=0, direktno kreiraj PlanItem:
+                    $ok = $this->createItemIfBudgetAllows($plan, $activity, $from, $to);
+                    if (!$ok) {
+                        PlanItem::create([
+                            'travel_plan_id' => $plan->id,
+                            'activity_id'    => $activity->id,
+                            'name'           => $activity->name,
+                            'time_from'      => $from,
+                            'time_to'        => $to,
+                            'amount'         => 0,
+                        ]);
+                        $plan->refresh();
+                    }
+
+                    $maxFreePerPlanUsed++;
+                    $freeUsedDay++;
                 }
-
-                [$slotFrom, $slotTo] = $slot;
-
-                $this->createItemIfBudgetAllows($plan, $activity, $slotFrom, $slotTo);
-
-                //helper u sledećem pozivu vidi nov zauzet termin
             }
 
             $day->addDay();
         }
     }
+
 
     /**
      * Pronalazi sledeći slobodan slot (bez overlapa, Accommodation se ignoriše u blokadi).
@@ -349,5 +425,13 @@ class TravelPlanStoreService
         $plan->refresh();
 
         return $item;
+    }
+
+    private function syncTotalCost(TravelPlan $plan): void //za slucaj neusklađenosti na kraju kreiranja plana
+    {
+        $sum = (float) $plan->planItems()->sum('amount');
+        if ($sum !== (float) $plan->total_cost) {
+            $plan->update(['total_cost' => $sum]);
+        }
     }
 }

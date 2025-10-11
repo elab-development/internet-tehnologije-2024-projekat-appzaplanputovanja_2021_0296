@@ -72,23 +72,25 @@ class TravelPlanController extends Controller
     {
         $this->authorize('create', TravelPlan::class);
 
-         $validStartLocations = ['Belgrade','Ljubljana','Zagreb','Sarajevo','Novi Sad','Niš'];
+         $destinations = Activity::distinct()->pluck('location')->filter()->values();
+         // Uzimamo sve jedinstvene destinacije (location) iz aktivnosti, bez duplikata i praznih vrednosti.
+
+         $startLocations = Activity::whereNotNull('start_location')->distinct()->pluck('start_location')->values();
+         // Uzimamo sve jedinstvene start lokacije (start_location) iz aktivnosti koje ih imaju popunjene (Transport).
 
         $data = $request->validate([
-            'start_location'  => ['required', 'string', Rule::in($validStartLocations)],
-            'destination'     => ['required', 'string',
-                                 Rule::in(Activity::query()->distinct()->pluck('location')->toArray()), ], //PHP niz od jedinstvenih vrednosti iz kolone location iz activities tabele
+            'destination'     => ['required', 'string', Rule::in($destinations)],
+            'start_location'  => ['required', 'string', Rule::in($startLocations)],
+            'transport_mode'  => ['required', 'string', Rule::in(Activity::availableTransportModes())],
+            'accommodation_class' => ['required', 'string', Rule::in(Activity::availableAccommodationClasses())],
+            'preferences'     => 'required|array',
+            'preferences.*'   => [
+                                Rule::in(Activity::availablePreferenceTypes()),],
+            
             'start_date'      => ['required', 'date', 'after:today'],
             'end_date'        => 'required|date|after_or_equal:start_date',
             'budget'          => 'required|numeric|min:1',
             'passenger_count' => 'required|integer|min:1',
-            'preferences'     => 'required|array',
-            'preferences.*'   => [
-                                Rule::in(Activity::availablePreferenceTypes()),],
-            'transport_mode' => ['required', Rule::in(['airplane','train','car','bus'])],
-            'accommodation_class'=> ['required',
-                                    Rule::in(['hostel','guesthouse','budget_hotel','standard_hotel','boutique_hotel','luxury_hotel',
-                                    'resort','apartment','bed_and_breakfast','villa','mountain_lodge','camping','glamping'])],
         ]);
 
         $data['user_id'] = $request->user()->id;
