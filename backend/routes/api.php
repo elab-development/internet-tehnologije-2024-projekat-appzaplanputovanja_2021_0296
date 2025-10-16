@@ -16,6 +16,9 @@ use App\Http\Controllers\{AuthController, TravelPlanController, ActivityControll
 */
 
 // PUBLIC (svi)
+Route::get('/activity-options', [ActivityController::class, 'options']);
+Route::get('/destinations-feed', [ActivityController::class, 'destinationsFeed']);
+
 Route::apiResource('activities', ActivityController::class)
     ->only(['index','show']);
     

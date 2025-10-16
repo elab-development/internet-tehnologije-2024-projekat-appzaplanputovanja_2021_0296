@@ -33,6 +33,7 @@ export default function TravelPlanForm({
   error = "",
   onSubmit,
   onCancel,
+  disableSubmit = false,
 }) {
   //   lokalni state forme
   const [form, setForm] = React.useState({
@@ -52,18 +53,26 @@ export default function TravelPlanForm({
     setForm((f) => {
       const next = { ...f };
 
-      if (!next.start_location && (lists.startLocations?.length ?? 0) > 0) {
+      if (
+        !lockedFields.includes("start_location") &&
+        !next.start_location &&
+        (lists.startLocations?.length ?? 0) > 0
+      ) {
         next.start_location = lists.startLocations[0]; // statičan niz koji šalješ iz CreateTravelPlan
       }
 
-      if (!next.destination && (lists.destinations?.length ?? 0) > 0) {
+      if (
+        !lockedFields.includes("destination") &&
+        !next.destination &&
+        (lists.destinations?.length ?? 0) > 0
+      ) {
         const first = lists.destinations[0];
         next.destination = typeof first === "string" ? first : first.value;
       }
 
       return next;
     });
-  }, [lists.startLocations, lists.destinations]);
+  }, [lists.startLocations, lists.destinations, lockedFields]);
 
   //   helperi za promenu polja
   const onChange = (e) => {
@@ -82,10 +91,15 @@ export default function TravelPlanForm({
   const isLocked = (name) => lockedFields.includes(name);
 
   //   male util funkcije za listu (dozvoljeno je proslediti niz stringova ili {value,label})
-  const toOptions = (arr) =>
-    (arr || []).map((x) =>
-      typeof x === "string" ? { value: x, label: humanize(x) } : x
-    );
+  const toOptions = React.useCallback(
+    (arr) =>
+      (arr || []).map((x) =>
+        typeof x === "string"
+          ? { value: x, label: humanize(x) }
+          : { value: x.value, label: x.label ?? humanize(x.value) }
+      ),
+    []
+  );
 
   return (
     <form
@@ -108,7 +122,7 @@ export default function TravelPlanForm({
                   label="Start location"
                   name="start_location"
                   disabled
-                  defaultValue={form.start_location ?? ""}
+                  value={form.start_location ?? ""}
                 />
               </div>
             )}
@@ -118,7 +132,7 @@ export default function TravelPlanForm({
                   label="Destination"
                   name="destination"
                   disabled
-                  defaultValue={form.destination ?? ""}
+                  value={form.destination ?? ""}
                 />
               </div>
             )}
@@ -128,7 +142,7 @@ export default function TravelPlanForm({
                   label="Transport mode"
                   name="transport_mode"
                   disabled
-                  defaultValue={humanize(form.transport_mode ?? "")}
+                  value={humanize(form.transport_mode ?? "")}
                 />
               </div>
             )}
@@ -138,7 +152,7 @@ export default function TravelPlanForm({
                   label="Accommodation class"
                   name="accommodation_class"
                   disabled
-                  defaultValue={humanize(form.accommodation_class ?? "")}
+                  value={humanize(form.accommodation_class ?? "")}
                 />
               </div>
             )}
@@ -148,9 +162,7 @@ export default function TravelPlanForm({
                   label="Preferences"
                   name="preferences"
                   disabled
-                  defaultValue={(form.preferences || [])
-                    .map(humanize)
-                    .join(", ")}
+                  value={(form.preferences || []).map(humanize).join(", ")}
                 />
               </div>
             )}
@@ -309,7 +321,7 @@ export default function TravelPlanForm({
       </div>
 
       <div className="d-flex gap-2 mt-3">
-        <PrimaryButton type="submit" disabled={busy}>
+        <PrimaryButton type="submit" disabled={busy || disableSubmit}>
           {busy
             ? mode === "edit"
               ? "Updating..."

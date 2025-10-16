@@ -5,69 +5,27 @@ import NavBar from "../components/NavBar";
 import { api } from "../api/client";
 import { useAuth } from "../context/AuthContext";
 import TravelPlanForm from "../components/ui/TravelPlanForm";
-
-// Enumerations aligned with backend migrations
-// transport_mode: ['airplane','train','car','bus','ferry','cruise ship']
-// accommodation_class: ['hostel','guesthouse','budget_hotel','standard_hotel','boutique_hotel','luxury_hotel','resort','apartment','bed_and_breakfast','villa','mountain_lodge','camping','glamping']
-const TRANSPORT_MODES = ["airplane", "train", "car", "bus"];
-
-const ACCOMMODATION_CLASSES = [
-  "hostel",
-  "guesthouse",
-  "budget_hotel",
-  "standard_hotel",
-  "boutique_hotel",
-  "luxury_hotel",
-  "resort",
-  "apartment",
-  "bed_and_breakfast",
-  "villa",
-  "mountain_lodge",
-  "camping",
-  "glamping",
-];
-
-// Preferences (match backend Activity::availablePreferenceTypes / your JSON column)
-const PREFERENCES = [
-  "travel_with_children",
-  "enjoy_nature",
-  "love_food_and_drink",
-  "want_to_relax",
-  "want_culture",
-  "seek_fun",
-  "adventurous",
-  "avoid_crowds",
-  "comfortable_travel",
-  "cafe_sitting",
-  "shopping",
-  "want_to_learn",
-  "active_vacation",
-  "research_of_tradition",
-];
-
-const START_LOCATIONS = [
-  "Belgrade",
-  "Ljubljana",
-  "Zagreb",
-  "Sarajevo",
-  "Novi Sad",
-  "Niš",
-];
+import useActivityOptions from "../hooks/useActivityOptions";
 
 const humanize = (s) =>
-  s.replace(/_/g, " ").replace(/\b[a-z]/g, (c) => c.toUpperCase());
-
-const ACCOMM_OPTS = ACCOMMODATION_CLASSES.map((v) => ({
-  value: v,
-  label: humanize(v),
-}));
+  String(s)
+    .replace(/_/g, " ")
+    .replace(/\b[a-z]/g, (c) => c.toUpperCase());
 
 export default function CreateTravelPlan() {
   const nav = useNavigate();
   const { isAuth } = useAuth();
 
-  // destinations will be fetched from /activities and grouped by unique location
-  const [destinations, setDestinations] = React.useState([]);
+  // sve opcije sa backenda (destinacije, start lokacije, modovi, klase, preferencije)
+  const {
+    loading: optsLoading,
+    error: optsError,
+    destinations,
+    startLocations,
+    transportModes,
+    accommodationClasses,
+    preferences,
+  } = useActivityOptions();
 
   // form state
   const [form, setForm] = React.useState({
@@ -87,63 +45,19 @@ export default function CreateTravelPlan() {
   const [error, setError] = React.useState("");
   const [fieldErrors, setFieldErrors] = React.useState({});
 
-  // today min for start_date (backend: after:today)
-  const todayStr = React.useMemo(() => {
-    const d = new Date();
-    d.setHours(0, 0, 0, 0);
-    const y = d.getFullYear();
-    const m = String(d.getMonth() + 1).padStart(2, "0");
-    const day = String(d.getDate()).padStart(2, "0");
-    return `${y}-${m}-${day}`;
-  }, []);
-
   const onChange = (e) => {
     const { name, value } = e.target;
     setForm((f) => ({ ...f, [name]: value }));
   };
-
   const onChangeNumber = (e) => {
     const { name, value } = e.target;
     const num = value === "" ? "" : Number(value);
     setForm((f) => ({ ...f, [name]: num }));
   };
-
   const onChangePrefs = (vals) => {
     setForm((f) => ({ ...f, preferences: vals }));
   };
 
-  const loadDestinations = React.useCallback(async () => {
-    try {
-      const unique = new Set();
-      let page = 1;
-      while (true) {
-        const { data } = await api.get(`/activities?page=${page}`);
-        const items = data?.data ?? [];
-        items.forEach((a) => {
-          if (a.location) unique.add(a.location);
-        });
-        const cur = data?.meta?.current_page ?? page;
-        const last = data?.meta?.last_page ?? cur;
-        if (cur >= last) break;
-        page = cur + 1;
-      }
-      setDestinations(Array.from(unique).sort((a, b) => a.localeCompare(b)));
-    } catch (e) {
-      console.error(e);
-      setDestinations([]);
-    }
-  }, []);
-
-  React.useEffect(() => {
-    if (!isAuth) return;
-    loadDestinations();
-  }, [isAuth, loadDestinations]);
-
-  const handleCancel = () => {
-    nav("/dashboard");
-  };
-
-  // helper za CREATE novog plana
   const handleSubmitWith = async (vals) => {
     try {
       setBusy(true);
@@ -159,14 +73,13 @@ export default function CreateTravelPlan() {
         budget: Number(vals.budget),
         transport_mode: vals.transport_mode,
         accommodation_class: vals.accommodation_class,
-        preferences: vals.preferences, // niz stringova
+        preferences: vals.preferences,
       };
 
       const { data } = await api.post("/travel-plans", payload);
       const plan = data?.data ?? data;
       nav(`/dashboard/plans/${plan.id}`);
     } catch (err) {
-      // primer mapiranja 422 validacije
       if (err?.response?.status === 422) {
         const errs = err.response.data.errors || {};
         setFieldErrors(
@@ -182,6 +95,16 @@ export default function CreateTravelPlan() {
     }
   };
 
+  // UI helpers
+  const ACCOMM_OPTS = React.useMemo(
+    () =>
+      (accommodationClasses || []).map((v) => ({
+        value: v,
+        label: humanize(v),
+      })),
+    [accommodationClasses]
+  );
+
   return (
     <div className="create-plan">
       <NavBar variant="dashboard-simple" />
@@ -192,32 +115,34 @@ export default function CreateTravelPlan() {
           budget.
         </p>
 
+        {optsLoading && !optsError ? (
+          <div className="alert alert-info">Loading activity options…</div>
+        ) : optsError ? (
+          <div className="alert alert-warning">
+            Failed to load options. You can still try to submit the form.
+          </div>
+        ) : null}
+
         <TravelPlanForm
           mode="create"
-          initialValues={{
-            start_location: form.start_location,
-            destination: form.destination,
-            start_date: form.start_date,
-            end_date: form.end_date,
-            passenger_count: form.passenger_count,
-            budget: form.budget,
-            preferences: form.preferences,
-            transport_mode: form.transport_mode,
-            accommodation_class: form.accommodation_class,
-          }}
-          lockedFields={[]} //    na create nema zaključanih polja
+          initialValues={form}
+          lockedFields={[]}
           lists={{
-            startLocations: START_LOCATIONS,
+            startLocations,
             destinations,
-            transportModes: TRANSPORT_MODES,
+            transportModes,
             accommodationOptions: ACCOMM_OPTS,
-            preferencesList: PREFERENCES,
+            preferencesList: preferences,
           }}
-          busy={busy}
+          busy={busy || optsLoading}
           fieldErrors={fieldErrors}
           error={error}
           onSubmit={handleSubmitWith}
           onCancel={() => nav("/dashboard")}
+          // (opciono) ako TravelPlanForm prima ova 3 handlera:
+          onChange={onChange}
+          onChangeNumber={onChangeNumber}
+          onChangePrefs={onChangePrefs}
         />
       </div>
     </div>
