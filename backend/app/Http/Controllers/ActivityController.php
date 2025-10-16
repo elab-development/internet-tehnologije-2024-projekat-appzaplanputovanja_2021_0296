@@ -11,6 +11,8 @@ use Illuminate\Database\QueryException;
 use App\Http\Resources\ActivityResource;
 use Carbon\Carbon;
 use App\Services\TravelPlanUpdateService;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 
 class ActivityController extends Controller
 {
@@ -259,4 +261,120 @@ class ActivityController extends Controller
             
         }
     }
+    public function options()
+    {
+        try {
+            $data = Cache::remember('activity_options_v1', 600, function () {
+
+                // Destinacije
+                $destinations = Activity::query()
+                    ->whereNotNull('location')
+                    ->distinct()->orderBy('location')
+                    ->pluck('location');
+
+                // Start lokacije
+                $startLocations = Activity::query()
+                    ->where('type', 'Transport')
+                    ->whereNotNull('start_location')
+                    ->distinct()->orderBy('start_location')
+                    ->pluck('start_location');
+
+                // Transport modovi
+                $transportModes = Activity::query()
+                    ->where('type', 'Transport')
+                    ->whereNotNull('transport_mode')
+                    ->distinct()->orderBy('transport_mode')
+                    ->pluck('transport_mode');
+
+                // Smeštajne klase
+                $accommodationCls = Activity::query()
+                    ->where('type', 'Accommodation')
+                    ->whereNotNull('accommodation_class')
+                    ->distinct()->orderBy('accommodation_class')
+                    ->pluck('accommodation_class');
+
+                // PREFS: unija iz JSON kolone preference_types
+                $prefRows = Activity::query()
+                    ->whereNotNull('preference_types')
+                    ->pluck('preference_types');  // dobijas array ili JSON string (zavisi od $casts u modelu)
+
+                $preferences = Activity::query()
+                ->whereNotNull('preference_types')
+                ->pluck('preference_types')
+                ->flatten()
+                ->filter()
+                ->unique()
+                ->sort()
+                ->values()
+                ->all();
+
+                return compact(
+                    'destinations',
+                    'startLocations',
+                    'transportModes',
+                    'accommodationCls',
+                    'preferences'
+                );
+            });
+
+            return response()->json($data);
+        } catch (\Throwable $e) {
+            \Log::error("Activity options failed: ".$e->getMessage());
+            return response()->json(['error' => $e->getMessage()], 500);
+        }
+    }
+
+    public function destinationsFeed()
+    {
+        $perPage = (int) request('perPage', 12);
+
+        // 1) izdvojimo PREGLED lokacija (distinct + paginate)
+        $page = (int) request('page', 1);
+        $cacheKey = "dest_feed_locs_v1:page={$page}:per={$perPage}";
+
+        $payload = Cache::remember($cacheKey, 600, function () use ($perPage) {
+            // DISTINCT + paginate — rešavamo paginaciju lokacija
+            $locationsPage = DB::table('activities')
+                ->select('location')
+                ->whereNotNull('location')
+                ->distinct()
+                ->orderBy('location')
+                ->paginate($perPage);
+
+            $locations = collect($locationsPage->items())->pluck('location');
+
+            // 2) za svaku lokaciju uzmi do 15 "slobodnih" aktivnosti
+            //    (bez Transport/Accommodation). Ako želiš stabilniji izbor, zameni
+            //    ->inRandomOrder() sa ->orderBy('popularity') ili sl.
+            $cardsByLoc = [];
+            foreach ($locations as $loc) {
+                $cardsByLoc[$loc] = Activity::query()
+                    ->where('location', $loc)
+                    ->whereNotIn('type', ['Transport', 'Accommodation'])
+                    ->select('id','name','type','price','duration','image_url','location')
+                    ->inRandomOrder()            // brzi vizuelni miks; može i deterministički sort
+                    ->limit(15)
+                    ->get()
+                    ->toArray();
+            }
+
+            return [
+                'data' => [
+                    'locations' => $locations->values(),
+                    'cards'     => $cardsByLoc,
+                ],
+                'meta' => [
+                    'current_page' => $locationsPage->currentPage(),
+                    'last_page'    => $locationsPage->lastPage(),
+                    'per_page'     => $locationsPage->perPage(),
+                    'total'        => $locationsPage->total(), // broj lokacija, ne aktivnosti
+                ],
+            ];
+        });
+
+        return response()->json($payload);
+    }
+    
+
+
 }

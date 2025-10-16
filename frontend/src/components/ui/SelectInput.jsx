@@ -1,41 +1,70 @@
+// src/components/ui/SelectInput.jsx
 import React from "react";
+
+let __autoId = 0;
 
 export default function SelectInput({
   id,
   label,
-  value,
+  value = "",
   onChange,
   options = [],
   placeholder = "Select...",
   error,
+  className = "",
   ...props
 }) {
+  const selectId = React.useMemo(() => id || `si_${++__autoId}`, [id]);
+  const errorId = `${selectId}__error`;
+
+  const cls = `form-select${error ? " is-invalid" : ""} ${className}`.trim();
+
   return (
     <div className="mb-3">
       {label && (
-        <label htmlFor={id} className="form-label">
+        <label htmlFor={selectId} className="form-label">
           {label}
         </label>
       )}
+
       <select
-        id={id}
-        className={`form-select${error ? " is-invalid" : ""}`}
+        id={selectId}
+        className={cls}
         value={value}
         onChange={onChange}
+        aria-invalid={!!error}
+        aria-describedby={error ? errorId : undefined}
         {...props}
       >
-        <option value="">{placeholder}</option>
-        {options.map((opt) => {
+        {/* Placeholder ima smisla samo kad value === "" */}
+        {value === "" && (
+          <option value="" disabled>
+            {placeholder}
+          </option>
+        )}
+        {options.map((opt, idx) => {
           const val = typeof opt === "string" ? opt : opt.value;
-          const txt = typeof opt === "string" ? opt : opt.label;
+          const txt =
+            typeof opt === "string" ? opt : opt.label ?? humanize(opt.value);
           return (
-            <option key={val} value={val}>
+            <option key={`${val}-${idx}`} value={val}>
               {txt}
             </option>
           );
         })}
       </select>
-      {error ? <div className="invalid-feedback d-block">{error}</div> : null}
+
+      {error ? (
+        <div id={errorId} className="invalid-feedback d-block">
+          {error}
+        </div>
+      ) : null}
     </div>
   );
+}
+
+function humanize(s) {
+  return String(s)
+    .replace(/_/g, " ")
+    .replace(/\b[a-z]/g, (c) => c.toUpperCase());
 }

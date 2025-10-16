@@ -1,26 +1,22 @@
 // src/pages/EditTravelPlan.jsx
 import React from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import NavBar from "../components/NavBar"; // koristi varijantu "dashboard-simple"
+import NavBar from "../components/NavBar";
 import { api } from "../api/client";
 import { useAuth } from "../context/AuthContext";
 import TravelPlanForm from "../components/ui/TravelPlanForm";
 
 export default function EditTravelPlan() {
-  //    Učitavamo ID iz rute i kontekst autentikacije
   const { id } = useParams();
   const { isAuth } = useAuth();
   const navigate = useNavigate();
 
-  //    UI state
   const [loading, setLoading] = React.useState(true);
   const [saving, setSaving] = React.useState(false);
   const [error, setError] = React.useState("");
+  const [fieldErrors, setFieldErrors] = React.useState({});
 
-  //    Držimo ceo plan da bismo prikazali read-only polja
   const [plan, setPlan] = React.useState(null);
-
-  //    Editable polja forme
   const [form, setForm] = React.useState({
     start_date: "",
     end_date: "",
@@ -28,25 +24,17 @@ export default function EditTravelPlan() {
     budget: 0,
   });
 
-  //    Helper za promenu polja
-  const onChange = (e) => {
-    const { name, value } = e.target;
-    setForm((f) => ({ ...f, [name]: value }));
-  };
-
-  //    Učitavanje postojećeg plana
   React.useEffect(() => {
     let mounted = true;
     (async () => {
       try {
         setLoading(true);
         setError("");
+        setFieldErrors({});
         const { data } = await api.get(`/travel-plans/${id}`);
         if (!mounted) return;
-
-        const p = data?.data ?? data; //    fleksibilno, u zavisnosti od API resource-a
+        const p = data?.data ?? data;
         setPlan(p);
-
         setForm({
           start_date: p?.start_date ?? "",
           end_date: p?.end_date ?? "",
@@ -64,39 +52,6 @@ export default function EditTravelPlan() {
     };
   }, [id]);
 
-  /*const doUpdateWith = async (payload) => {
-    try {
-      setSaving(true);
-      setError("");
-      await api.patch(`/travel-plans/${id}`, payload);
-      navigate(`/dashboard/plans/${id}`); //    vrati korisnika na prikaz plana
-    } catch (err) {
-      console.error(err);
-      setError("Update failed. Please check the entered values.");
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  //    Validacija osnovnih pravila (minimalno, backend je izvor istine)
-  const validate = () => {
-    const { start_date, end_date, passenger_count, budget } = form;
-
-    if (!start_date || !end_date) {
-      return "Start date and end date are required.";
-    }
-    if (new Date(start_date) >= new Date(end_date)) {
-      return "End date must be after the start date.";
-    }
-    if (Number(passenger_count) <= 0) {
-      return "Passenger count must be greater than 0.";
-    }
-    if (Number(budget) <= 0) {
-      return "Budget must be greater than 0.";
-    }
-    return "";
-  };*/
-
   const validateVals = (vals) => {
     const { start_date, end_date, passenger_count, budget } = vals;
     if (!start_date || !end_date)
@@ -111,69 +66,83 @@ export default function EditTravelPlan() {
 
   const toIso = (s) => {
     if (!s) return s;
-    // već ISO?
     if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
-    // DD.MM.YYYY ili DD.MM.YYYY.
     const m = String(s).match(/^(\d{2})\.(\d{2})\.(\d{4})\.?$/);
     if (m) return `${m[3]}-${m[2]}-${m[1]}`;
     return s;
   };
-  const onSubmit = async (vals) => {
-    // (opciono) lagana validacija – ako koristiš, validiraj vals
-    const v = validateVals(vals);
-    if (v) {
-      setError(v);
-      return;
-    }
-
-    // napravi payload SAMO sa izmenjenim poljima
+  const buildPayload = (vals, plan) => {
     const payload = {};
-
-    // datumi – normalizuj format i šalji samo ako su promenjeni
     const startIso = toIso(vals.start_date);
     const endIso = toIso(vals.end_date);
 
     if (startIso && startIso !== plan.start_date) payload.start_date = startIso;
     if (endIso && endIso !== plan.end_date) payload.end_date = endIso;
 
-    // numerična polja – šalji samo ako je stvarno promenjeno
     const pc = Number(vals.passenger_count);
     const bd = Number(vals.budget);
 
-    if (!Number.isNaN(pc) && pc !== Number(plan.passenger_count)) {
+    if (!Number.isNaN(pc) && pc !== Number(plan.passenger_count))
       payload.passenger_count = pc;
-    }
-    if (!Number.isNaN(bd) && bd !== Number(plan.budget)) {
-      payload.budget = bd;
+    if (!Number.isNaN(bd) && bd !== Number(plan.budget)) payload.budget = bd;
+
+    return payload;
+  };
+
+  // izračunaj da li postoji stvarna promena (za disable submit-a)
+  const hasChanges = React.useMemo(() => {
+    if (!plan) return false;
+    const payload = buildPayload(form, plan);
+    return Object.keys(payload).length > 0;
+  }, [plan, form]);
+
+  const onSubmit = async (vals) => {
+    const v = validateVals(vals);
+    if (v) {
+      setError(v);
+      return;
     }
 
-    // ako nema promena, nema PATCH-a
-    if (Object.keys(payload).length === 0) return;
+    if (!plan) return;
+
+    const payload = buildPayload(vals, plan);
+    if (Object.keys(payload).length === 0) {
+      setError("No changes to save.");
+      return;
+    }
 
     try {
       setSaving(true);
       setError("");
+      setFieldErrors({});
       await api.patch(`/travel-plans/${id}`, payload);
       navigate(`/dashboard/plans/${id}`);
     } catch (err) {
-      console.log("BE full response:", err?.response?.data);
-      setError(
-        err?.response?.data?.message ||
-          err?.response?.data?.error ||
-          "Update failed. Please check the entered values."
-      );
+      const status = err?.response?.status;
+      const data = err?.response?.data;
+      if (status === 422) {
+        const errs = data?.errors || {};
+        setFieldErrors(
+          Object.fromEntries(
+            Object.entries(errs).map(([k, v]) => [k, v?.[0] ?? "Invalid value"])
+          )
+        );
+        setError(data?.message || "Validation failed.");
+      } else {
+        setError(
+          data?.message ||
+            data?.error ||
+            "Update failed. Please check the entered values."
+        );
+      }
     } finally {
       setSaving(false);
     }
   };
 
-  //    Odustajanje – vrati na prikaz plana
-  const onCancel = () => {
-    navigate(`/dashboard/plans/${id}`);
-  };
+  const onCancel = () => navigate(`/dashboard/plans/${id}`);
 
   if (!isAuth) {
-    //    Poželjno je imati zaštitu ruta, ali ovde samo fallback
     return (
       <>
         <NavBar variant="dashboard-simple" />
@@ -186,7 +155,6 @@ export default function EditTravelPlan() {
 
   return (
     <>
-      {/*    Navbar – koristi varijantu dashboard-simple (u samoj NavBar komponenti iskoristi prop) */}
       <NavBar variant="dashboard-simple" />
 
       <div className="container py-4 edit-plan-container">
@@ -205,7 +173,6 @@ export default function EditTravelPlan() {
                   <TravelPlanForm
                     mode="edit"
                     initialValues={{
-                      //    zaključana polja se prikazuju u disabled fieldset-u
                       start_location: plan.start_location,
                       destination: plan.destination,
                       transport_mode: plan.transport_mode,
@@ -213,8 +180,6 @@ export default function EditTravelPlan() {
                       preferences: Array.isArray(plan.preferences)
                         ? plan.preferences
                         : plan.preferences ?? [],
-
-                      //    editable polja
                       start_date: form.start_date,
                       end_date: form.end_date,
                       passenger_count: form.passenger_count,
@@ -227,12 +192,14 @@ export default function EditTravelPlan() {
                       "accommodation_class",
                       "preferences",
                     ]}
-                    lists={{}} //    na edit ne trebaju liste (sve je read-only osim 4 polja)
+                    lists={{}}
                     busy={saving}
-                    fieldErrors={{}} //    mapiraj 422 ako želiš detaljna polja
+                    fieldErrors={fieldErrors} // <= NOVO
                     error={error}
                     onSubmit={onSubmit}
-                    onCancel={() => navigate(`/dashboard/plans/${id}`)}
+                    onCancel={onCancel}
+                    // ako TravelPlanForm podržava: onChange, disableSubmit
+                    disableSubmit={saving || !hasChanges}
                   />
                 )}
               </div>
