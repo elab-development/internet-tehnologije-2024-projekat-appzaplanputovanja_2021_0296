@@ -119,33 +119,19 @@ class TravelPlanController extends Controller
     {
         $this->authorize('update', $travelPlan);
 
-        return DB::transaction(function () use ($request, $travelPlan, $svc) {
+        $data = $request->validate([
+            'user_id'               => ['prohibited'],
+            'start_location'        => ['prohibited'],
+            'destination'           => ['prohibited'],
+            'preferences'           => ['prohibited'],
+            'transport_mode'        => ['prohibited'],
+            'accommodation_class'   => ['prohibited'],
 
-            //Zaključaj plan u transakciji
-            $travelPlan->lockForUpdate();
-            $travelPlan->load(['planItems.activity']);
-
-            //Trenutne vrednosti i pomoćne kolekcije
-            $currentTotal = (float) $travelPlan->total_cost;
-
-            $data = $request->validate([
-                'user_id'         => ['prohibited'], 
-                'start_location'  => ['prohibited'],
-                'destination'     => ['prohibited'],
-                'preferences'     => ['prohibited'],
-                'transport_mode'  => ['prohibited'],
-                'accommodation_class' => ['prohibited'],
-                'start_date' => ['sometimes','required','date','after:today'],
-                'end_date'        => ['sometimes','required','date','after_or_equal:start_date'],
-                'passenger_count' => ['sometimes','required','integer','min:1'],
-                'budget'          => ['sometimes','numeric','min:1', 
-                // atribut-budget, nova vrednost atributa, fail callback-ako je greska
-                                    function($attr,$value,$fail) use ($currentTotal){
-                                        if ($value < $currentTotal) {
-                                            $fail("The budget cannot be less than the current total cost ({$currentTotal}).");
-                                        }
-                                    }],
-            ],[
+            'start_date'            => ['sometimes','required','date','after:today'],
+            'end_date'              => ['sometimes','required','date','after_or_equal:start_date'],
+            'passenger_count'       => ['sometimes','required','integer','min:1'],
+            'budget'                => ['sometimes','numeric','min:1'],
+        ],[
             'user_id.prohibited'                => 'User cannot be changed after creation.',
             'start_location.prohibited'         => 'Start location cannot be changed after creation.',
             'destination.prohibited'            => 'Destination cannot be changed after creation.',
@@ -154,17 +140,34 @@ class TravelPlanController extends Controller
             'accommodation_class.prohibited'    => 'Accommodation class cannot be changed after creation.',
         ]);
 
+        return DB::transaction(function () use ($data, $travelPlan, $svc) {
+
+            
+            $travelPlan->load(['planItems.activity']);
+
             // stare vrednosti
             $oldStart  = Carbon::parse($travelPlan->start_date);
             $oldEnd    = Carbon::parse($travelPlan->end_date);
             $oldPax    = (int) $travelPlan->passenger_count;
             $oldBudget = (float) $travelPlan->budget;
 
-            // primeni nove vrednosti
-            $travelPlan->fill($data);
-            $travelPlan->save();
-            $travelPlan->refresh();
+            // BUDŽET – OBAVEZNO PRVO i ISKLJUČIVO kroz servis
+            if (array_key_exists('budget', $data)) {
+                $newBudget = (float) $data['budget'];
+                // adjustBudget će baciti BusinessRuleException('BUDGET_EXCEEDED', 422) ako je < total_cost
+                $svc->adjustBudget($travelPlan, $oldBudget, $newBudget);
+                unset($data['budget']); // da ne prođe kasnije kroz plain update
+                $travelPlan->refresh();
+            }
 
+            //  Primeni ostala polja (datumi, pax...) – bez budžeta
+            if (!empty($data)) {
+                $travelPlan->fill($data);
+                $travelPlan->save();
+                $travelPlan->refresh();
+            }
+
+            //Odredi koje su izmene stvarno nastale
             $changedDates  = (array_key_exists('start_date',$data) || array_key_exists('end_date',$data)) &&
                              ($travelPlan->start_date !== $oldStart->toDateTimeString() ||
                               $travelPlan->end_date   !== $oldEnd->toDateTimeString());
@@ -172,23 +175,22 @@ class TravelPlanController extends Controller
             $changedPax    = array_key_exists('passenger_count',$data) &&
                              ((int)$travelPlan->passenger_count !== $oldPax);
 
-            $changedBudget = array_key_exists('budget',$data) &&
-                             ((float)$travelPlan->budget !== $oldBudget);
 
-            // 1) Datumi
+            //  Datumi
             if ($changedDates) {
                 $svc->adjustDates($travelPlan, $oldStart, $oldEnd);
+                $travelPlan->refresh();
             }
 
-            // 2) Putnici
+            // Putnici
             if ($changedPax) {
                 $svc->adjustPassengerCount($travelPlan, $oldPax, (int)$travelPlan->passenger_count);
+                $travelPlan->refresh();
             }
 
-            // 3) Budžet
-            if ($changedBudget) {
-                $svc->adjustBudget($travelPlan, $oldBudget, (float)$travelPlan->budget);
-            }
+            // Konačno: re-račun ukupne cene (sigurnost)
+            $svc->recalcTotal($travelPlan);
+            $travelPlan->refresh();
 
             return new TravelPlanResource($travelPlan->fresh(['planItems.activity']));
         });

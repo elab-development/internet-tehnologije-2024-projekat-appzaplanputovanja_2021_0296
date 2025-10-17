@@ -1,8 +1,7 @@
-// src/pages/CreateTravelPlan.jsx
 import React from "react";
 import { useNavigate } from "react-router-dom";
 import NavBar from "../components/NavBar";
-import { api } from "../api/client";
+import api from "../api/client";
 import { useAuth } from "../context/AuthContext";
 import TravelPlanForm from "../components/ui/TravelPlanForm";
 import useActivityOptions from "../hooks/useActivityOptions";
@@ -16,7 +15,6 @@ export default function CreateTravelPlan() {
   const nav = useNavigate();
   const { isAuth } = useAuth();
 
-  // sve opcije sa backenda (destinacije, start lokacije, modovi, klase, preferencije)
   const {
     loading: optsLoading,
     error: optsError,
@@ -27,7 +25,6 @@ export default function CreateTravelPlan() {
     preferences,
   } = useActivityOptions();
 
-  // form state
   const [form, setForm] = React.useState({
     start_location: "",
     destination: "",
@@ -40,30 +37,11 @@ export default function CreateTravelPlan() {
     accommodation_class: "",
   });
 
-  // ui state
   const [busy, setBusy] = React.useState(false);
-  const [error, setError] = React.useState("");
-  const [fieldErrors, setFieldErrors] = React.useState({});
-
-  const onChange = (e) => {
-    const { name, value } = e.target;
-    setForm((f) => ({ ...f, [name]: value }));
-  };
-  const onChangeNumber = (e) => {
-    const { name, value } = e.target;
-    const num = value === "" ? "" : Number(value);
-    setForm((f) => ({ ...f, [name]: num }));
-  };
-  const onChangePrefs = (vals) => {
-    setForm((f) => ({ ...f, preferences: vals }));
-  };
 
   const handleSubmitWith = async (vals) => {
+    setBusy(true);
     try {
-      setBusy(true);
-      setError("");
-      setFieldErrors({});
-
       const payload = {
         start_location: vals.start_location,
         destination: vals.destination,
@@ -80,22 +58,12 @@ export default function CreateTravelPlan() {
       const plan = data?.data ?? data;
       nav(`/dashboard/plans/${plan.id}`);
     } catch (err) {
-      if (err?.response?.status === 422) {
-        const errs = err.response.data.errors || {};
-        setFieldErrors(
-          Object.fromEntries(
-            Object.entries(errs).map(([k, v]) => [k, v?.[0] ?? "Invalid value"])
-          )
-        );
-      } else {
-        setError("Create failed. Please check the entered values.");
-      }
+      //vec obradjeno globalno u api clientu
     } finally {
       setBusy(false);
     }
   };
 
-  // UI helpers
   const ACCOMM_OPTS = React.useMemo(
     () =>
       (accommodationClasses || []).map((v) => ({
@@ -135,14 +103,11 @@ export default function CreateTravelPlan() {
             preferencesList: preferences,
           }}
           busy={busy || optsLoading}
-          fieldErrors={fieldErrors}
-          error={error}
+          fieldErrors={{}}
+          error=""
           onSubmit={handleSubmitWith}
           onCancel={() => nav("/dashboard")}
-          // (opciono) ako TravelPlanForm prima ova 3 handlera:
-          onChange={onChange}
-          onChangeNumber={onChangeNumber}
-          onChangePrefs={onChangePrefs}
+          onFormChange={(vals) => setForm(vals)}
         />
       </div>
     </div>

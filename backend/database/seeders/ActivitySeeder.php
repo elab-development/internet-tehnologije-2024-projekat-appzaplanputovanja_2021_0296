@@ -148,6 +148,22 @@ class ActivitySeeder extends Seeder
             'Valencia'  => $this->img('/activity-images/Culture&SightseeingValencia.jpg'),
         ];
 
+        $accPriceByClass = [
+            'hostel'              => [20, 40],
+            'guesthouse'          => [30, 60],
+            'budget_hotel'        => [40, 70],
+            'standard_hotel'      => [60, 100],
+            'boutique_hotel'      => [80, 140],
+            'luxury_hotel'        => [120, 220],
+            'resort'              => [100, 180],
+            'apartment'           => [50, 120],
+            'bed_and_breakfast'   => [40, 80],
+            'villa'               => [150, 300],
+            'mountain_lodge'      => [60, 110],
+            'camping'             => [15, 35],
+            'glamping'            => [40, 90],
+        ];
+
        foreach ($startLocations as $start) {
             foreach ($locations as $dest) {
                 if ($start === $dest) continue;
@@ -187,12 +203,17 @@ class ActivitySeeder extends Seeder
         foreach ($locations as $loc) {
             foreach ($accClasses as $cls) {
                 $imgs = $accommodationImages[$cls] ?? [];
+                [$min, $max] = $accPriceByClass[$cls] ?? [50, 120]; 
+                $price = rand($min, $max);
+
                 Activity::factory()
                     ->accommodation($cls)
                     ->forLocation($loc)
                     ->state([
                         'name'      => "Accommodation in $loc ($cls)",
                         'image_url' => $imgs ? $imgs[array_rand($imgs)] : null,
+                        'price'     => $price, 
+                        'duration'  => 24*60, 
                     ])->create();
             }
         }
@@ -223,9 +244,9 @@ class ActivitySeeder extends Seeder
                     $price = match ($t) {
                         'Culture&Sightseeing' => (rand(1,10) <= 3) ? 0 : rand(5, 20),   // ~30% free, inače 5–20
                         'Nature&Adventure'    => (rand(1,10) <= 3) ? 0 : rand(10, 30),  // ~30% free, inače 10–30
-                        'Shopping&Souvenirs'   => rand(15, 60),
-                        'Relaxation&Wellness'  => rand(10, 40),
-                        'Food&Drink'           => rand(8, 35),
+                        'Shopping&Souvenirs'  => rand(12, 45), 
+                        'Relaxation&Wellness' => rand(8, 30),  
+                        'Food&Drink'          => rand(6, 25),  
                         default                => rand(5, 40),
                     };
 

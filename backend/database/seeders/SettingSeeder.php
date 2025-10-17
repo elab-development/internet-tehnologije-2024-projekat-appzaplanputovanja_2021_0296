@@ -15,9 +15,9 @@ class SettingSeeder extends Seeder
             ['key' => 'checkout_time',             'value' => '09:00'],
             ['key' => 'return_start',              'value' => '15:00'],
             ['key' => 'buffer_after_outbound_min', 'value' => '30'],
-            ['key' => 'buffer_before_return_min',  'value' => '0'],
+            ['key' => 'buffer_before_return_min',  'value' => '30'],
             ['key' => 'default_day_start',         'value' => '09:00'],
-            ['key' => 'default_day_end',           'value' => '20:00'],
+            ['key' => 'default_day_end',           'value' => '23:00'],
         ];
 
         foreach ($pairs as $p) {

@@ -1,4 +1,3 @@
-// src/components/DestinationsFeed.jsx
 import React from "react";
 import DestinationCard from "./DestinationCard";
 import useDestinationsFeed from "../hooks/useDestinationsFeed";

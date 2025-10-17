@@ -1,8 +1,7 @@
-// src/pages/EditTravelPlan.jsx
 import React from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import NavBar from "../components/NavBar";
-import { api } from "../api/client";
+import api from "../api/client";
 import { useAuth } from "../context/AuthContext";
 import TravelPlanForm from "../components/ui/TravelPlanForm";
 
@@ -13,8 +12,6 @@ export default function EditTravelPlan() {
 
   const [loading, setLoading] = React.useState(true);
   const [saving, setSaving] = React.useState(false);
-  const [error, setError] = React.useState("");
-  const [fieldErrors, setFieldErrors] = React.useState({});
 
   const [plan, setPlan] = React.useState(null);
   const [form, setForm] = React.useState({
@@ -29,8 +26,6 @@ export default function EditTravelPlan() {
     (async () => {
       try {
         setLoading(true);
-        setError("");
-        setFieldErrors({});
         const { data } = await api.get(`/travel-plans/${id}`);
         if (!mounted) return;
         const p = data?.data ?? data;
@@ -41,8 +36,6 @@ export default function EditTravelPlan() {
           passenger_count: p?.passenger_count ?? 1,
           budget: p?.budget ?? 0,
         });
-      } catch (err) {
-        setError("Failed to load the travel plan.");
       } finally {
         setLoading(false);
       }
@@ -71,6 +64,7 @@ export default function EditTravelPlan() {
     if (m) return `${m[3]}-${m[2]}-${m[1]}`;
     return s;
   };
+
   const buildPayload = (vals, plan) => {
     const payload = {};
     const startIso = toIso(vals.start_date);
@@ -89,7 +83,6 @@ export default function EditTravelPlan() {
     return payload;
   };
 
-  // izračunaj da li postoji stvarna promena (za disable submit-a)
   const hasChanges = React.useMemo(() => {
     if (!plan) return false;
     const payload = buildPayload(form, plan);
@@ -99,42 +92,24 @@ export default function EditTravelPlan() {
   const onSubmit = async (vals) => {
     const v = validateVals(vals);
     if (v) {
-      setError(v);
+      // lokalna UX validacija pre slanja (interceptor ne zna za nju)
+      window.scrollTo({ top: 0, behavior: "smooth" });
       return;
     }
-
     if (!plan) return;
 
     const payload = buildPayload(vals, plan);
     if (Object.keys(payload).length === 0) {
-      setError("No changes to save.");
+      // nema promena
       return;
     }
 
+    setSaving(true);
     try {
-      setSaving(true);
-      setError("");
-      setFieldErrors({});
       await api.patch(`/travel-plans/${id}`, payload);
       navigate(`/dashboard/plans/${id}`);
     } catch (err) {
-      const status = err?.response?.status;
-      const data = err?.response?.data;
-      if (status === 422) {
-        const errs = data?.errors || {};
-        setFieldErrors(
-          Object.fromEntries(
-            Object.entries(errs).map(([k, v]) => [k, v?.[0] ?? "Invalid value"])
-          )
-        );
-        setError(data?.message || "Validation failed.");
-      } else {
-        setError(
-          data?.message ||
-            data?.error ||
-            "Update failed. Please check the entered values."
-        );
-      }
+      // vec obradjeno globalno u api clientu
     } finally {
       setSaving(false);
     }
@@ -167,8 +142,10 @@ export default function EditTravelPlan() {
               <div className="card-body">
                 {loading ? (
                   <div className="alert alert-info mb-0">Loading...</div>
-                ) : error ? (
-                  <div className="alert alert-danger mb-3">{error}</div>
+                ) : !plan ? (
+                  <div className="alert alert-danger mb-3">
+                    Failed to load the travel plan.
+                  </div>
                 ) : (
                   <TravelPlanForm
                     mode="edit"
@@ -194,12 +171,12 @@ export default function EditTravelPlan() {
                     ]}
                     lists={{}}
                     busy={saving}
-                    fieldErrors={fieldErrors} // <= NOVO
-                    error={error}
+                    fieldErrors={{}} /* interceptor pokazuje poruke */
+                    error="" /* interceptor pokazuje poruke */
                     onSubmit={onSubmit}
                     onCancel={onCancel}
-                    // ako TravelPlanForm podržava: onChange, disableSubmit
                     disableSubmit={saving || !hasChanges}
+                    onFormChange={(vals) => setForm(vals)}
                   />
                 )}
               </div>

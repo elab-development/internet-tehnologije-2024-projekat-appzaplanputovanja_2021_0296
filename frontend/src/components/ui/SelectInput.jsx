@@ -1,4 +1,3 @@
-// src/components/ui/SelectInput.jsx
 import React from "react";
 
 let __autoId = 0;

@@ -1,4 +1,3 @@
-// src/components/NavBar.jsx
 import React, { useEffect, useState } from "react";
 import {
   Link,

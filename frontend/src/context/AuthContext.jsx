@@ -1,4 +1,3 @@
-// src/context/AuthContext.jsx
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { AuthApi, getToken } from "../api/client";
 
@@ -30,7 +29,7 @@ export function AuthProvider({ children }) {
     if (res?.user?.name) localStorage.setItem("tp_user_name", res.user.name);
     setIsAuth(!!getToken());
   };
-  
+
   // 3) logout – AuthApi.logout briše token; ovde čistimo state
   const logout = async () => {
     await AuthApi.logout();
