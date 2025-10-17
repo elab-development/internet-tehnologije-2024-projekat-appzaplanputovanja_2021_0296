@@ -1,96 +1,90 @@
 import React, { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { api } from "../api/client";
+import api from "../api/client";
 import NavBar from "../components/NavBar";
 import PrimaryButton from "../components/ui/PrimaryButton";
+import { confirmDialog, showError, showSuccess } from "../api/notify";
 
 export default function ShowTravelPlan() {
-  const { id } = useParams(); // ID plana iz URL-a
+  const { id } = useParams();
   const navigate = useNavigate();
 
   const [plan, setPlan] = useState(null);
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [deleting, setDeleting] = useState(false);
-  const [error, setError] = useState("");
 
-  // Učitavanje plana i stavki plana iz backenda
+  // ===== LOAD plan & items =====
   useEffect(() => {
-    const load = async () => {
+    (async () => {
       try {
         setLoading(true);
-        setError("");
 
-        // GET /api/travel-plans/:id
         const { data: planRes } = await api.get(`/travel-plans/${id}`);
-        setPlan(planRes.data);
+        setPlan(planRes.data ?? planRes);
 
-        // GET /api/travel-plans/:id/items
         const { data: itemsRes } = await api.get(
           `/travel-plans/${id}/items?per_page=100`
         );
-        setItems(itemsRes.data);
+        setItems(itemsRes.data ?? itemsRes);
       } catch (err) {
-        console.error(err);
-        setError("Failed to load travel plan. Please try again later.");
+        showError("Failed to load travel plan. Please try again later.");
       } finally {
         setLoading(false);
       }
-    };
-    load();
+    })();
   }, [id]);
 
+  // ===== Navigation helpers =====
   const handleBack = () => navigate("/dashboard");
   const handleEdit = () => navigate(`/dashboard/plans/${id}/edit`);
 
+  // ===== DELETE with SweetAlert confirmation =====
   const handleDelete = async () => {
-    const ok = window.confirm(
-      "Are you sure you want to delete this travel plan?"
-    );
+    const ok = await confirmDialog({
+      title: "Delete travel plan?",
+      text: "This action cannot be undone.",
+      confirmText: "Delete",
+      icon: "warning",
+    });
     if (!ok) return;
 
     try {
       setDeleting(true);
-      await api.delete(`/travel-plans/${id}`); // backend: TravelPlanController@destroy (204)
+      await api.delete(`/travel-plans/${id}`);
+      showSuccess("Travel plan deleted.");
       navigate("/dashboard", { replace: true });
     } catch (err) {
-      console.error(err);
-      const msg =
-        err?.response?.data?.message ||
-        (err?.response?.status === 403
-          ? "You don't have permission to delete this plan."
-          : "Failed to delete the travel plan.");
-      alert(msg);
+      // detalji greške već će biti prikazani kroz interceptor
+      showError("Failed to delete the travel plan.");
     } finally {
       setDeleting(false);
     }
   };
 
+  // ===== PDF export =====
   const handleExportPdf = async () => {
     try {
       const response = await api.get(`/travel-plans/${id}/export/pdf`, {
-        responseType: "blob", // očekujemo binarni PDF
+        responseType: "blob",
       });
 
-      // Kreiraj blob URL i link
       const blob = new Blob([response.data], { type: "application/pdf" });
       const url = window.URL.createObjectURL(blob);
-
       const link = document.createElement("a");
       link.href = url;
-      link.setAttribute("download", `travel-plan-${id}.pdf`); // ime fajla
+      link.setAttribute("download", `travel-plan-${id}.pdf`);
       document.body.appendChild(link);
       link.click();
       link.parentNode.removeChild(link);
-
-      // Oslobodi memoriju
       window.URL.revokeObjectURL(url);
+      showSuccess("PDF successfully exported.");
     } catch (error) {
-      console.error("Failed to export PDF:", error);
-      alert("PDF export failed. Please try again later.");
+      showError("PDF export failed. Please try again later.");
     }
   };
 
+  // ====== UI ======
   if (loading)
     return (
       <>
@@ -102,29 +96,24 @@ export default function ShowTravelPlan() {
       </>
     );
 
-  if (error)
+  if (!plan)
     return (
       <>
         <NavBar variant="dashboard" />
-        <div className="container py-5">
-          <div className="alert alert-danger text-center">{error}</div>
-          <div className="text-center">
-            <PrimaryButton onClick={handleBack}>
-              Back to Dashboard
-            </PrimaryButton>
+        <div className="container py-5 text-center">
+          <div className="alert alert-danger mb-4">
+            Travel plan not found or failed to load.
           </div>
+          <PrimaryButton onClick={handleBack}>Back to Dashboard</PrimaryButton>
         </div>
       </>
     );
 
-  if (!plan) return null;
-
   return (
     <>
       <NavBar variant="dashboard-simple" />
-
       <div className="container py-4">
-        {/* Naziv i osnovni podaci o planu */}
+        {/* Plan info */}
         <div className="d-flex justify-content-between align-items-center mb-4 flex-wrap">
           <div>
             <h3 className="fw-bold mb-1">{plan.destination}</h3>
@@ -152,7 +141,7 @@ export default function ShowTravelPlan() {
           </div>
         </div>
 
-        {/* Lista aktivnosti */}
+        {/* Activities list */}
         <h5 className="mb-3">Planned Activities</h5>
         {items.length === 0 ? (
           <p className="text-muted">

@@ -1,7 +1,6 @@
-// src/pages/Dashboard.jsx
 import React, { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { api } from "../api/client";
+import api from "../api/client"; // <= default import
 import NavBar from "../components/NavBar";
 import TravelPlanCard from "../components/TravelPlanCard";
 import { useAuth } from "../context/AuthContext";
@@ -10,16 +9,15 @@ export default function Dashboard() {
   const { isAuth } = useAuth();
   const navigate = useNavigate();
 
-  const [searchParams, setSearchParams] = useSearchParams(); // da čitamo query parametre iz URL-a
+  const [searchParams, setSearchParams] = useSearchParams();
 
-  // data & ui state
   const [plans, setPlans] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
 
-  const [alert, setAlert] = useState({ type: null, msg: "" }); // 'warning' | 'danger' | null
+  // inline UX poruke (ne API greške)
+  const [alert, setAlert] = useState({ type: null, msg: "" });
 
-  // helper: normalize raznih JSON oblika iz backenda
+  // normalize helper
   const normalize = (d) =>
     Array.isArray(d)
       ? d
@@ -27,21 +25,17 @@ export default function Dashboard() {
       ? d.data
       : d?.data?.data ?? [];
 
-  // GLAVNA FUNKCIJA: pretraga/listanje planova
+  // listanje / pretraga
   async function fetchPlans(params = {}) {
     setLoading(true);
-    setError("");
     setAlert({ type: null, msg: "" });
 
     try {
-      // hasSearch: samo destinacija (q) ili samo datumi (oba), ili kombinacija
       const hasSearch = !!(params.q || (params.date_from && params.date_to));
-
-      // ako je pretraga -> /search, inače lista svih mojih planova
       const url = hasSearch ? "/travel-plans/search" : "/travel-plans";
+
       const resp = await api.get(url, { params });
 
-      // pokušaj da pročitaš meta.destination_exists iz travel plan controllera
       const meta =
         resp?.data?.meta ||
         resp?.data?.data?.meta ||
@@ -52,10 +46,9 @@ export default function Dashboard() {
       const list = normalize(resp.data);
       setPlans(list);
 
-      // ALERTI ZA PRAZNE REZULTATE (BEZ GREŠKE)
+      // UX poruke za prazan rezultat
       if (hasSearch && list.length === 0) {
         if (params.q && !params.date_from && !params.date_to) {
-          // samo destinacija, nema poklapanja
           setAlert({
             type: "warning",
             msg:
@@ -64,13 +57,11 @@ export default function Dashboard() {
                 : "You don't have travel plans for the entered parameters yet.",
           });
         } else if (!params.q && params.date_from && params.date_to) {
-          // samo datumi, nema poklapanja
           setAlert({
             type: "warning",
             msg: "You don't have plans within the selected dates.",
           });
         } else if (params.q && params.date_from && params.date_to) {
-          // destinacija + datumi, nema poklapanja
           setAlert({
             type: "warning",
             msg:
@@ -81,41 +72,16 @@ export default function Dashboard() {
         }
       }
     } catch (e) {
-      // VALIDACIJA DATUMA (422)
-      if (e?.response?.status === 422) {
-        const first =
-          Object.values(e?.response?.data?.errors || {})[0]?.[0] ||
-          e?.response?.data?.message ||
-          "Invalid date input.";
-        setAlert({ type: "danger", msg: first });
-        setPlans([]); // ne prikazuj listu kad je greška
-        setLoading(false);
-        return;
-      }
-
-      // TOKEN istekao
-      if (e?.response?.status === 401) {
-        navigate("/login", { replace: true });
-        return;
-      }
-
-      // ostale greške
-      const msg =
-        e?.response?.data?.message ||
-        e?.response?.data?.error ||
-        e?.message ||
-        "Failed to load your travel plans.";
-      setError(msg);
-
-      setPlans([]); // sakrij listu
+      // Sve API greške (422/401/403/500...) prikazuje globalni interceptor.
+      // Ovde samo “počistimo” listu da UI ne pokazuje stare podatke.
+      setPlans([]);
     } finally {
       setLoading(false);
     }
   }
 
-  // kad se promene URL parametri – ponovo fetch
   useEffect(() => {
-    if (!isAuth) return;
+    if (!isAuth) return; // ako nije ulogovan, NavBar će ponuditi login
     const params = Object.fromEntries(searchParams.entries());
     fetchPlans(params);
   }, [searchParams, isAuth]);
@@ -124,7 +90,6 @@ export default function Dashboard() {
 
   return (
     <div className="dashboard">
-      {/* DASHBOARD varijanta navbar-a(Search + Create + Logout) koja cuva pretragu*/}
       <NavBar variant="dashboard" onReset={() => setSearchParams({})} />
 
       <div className="container mt-4">

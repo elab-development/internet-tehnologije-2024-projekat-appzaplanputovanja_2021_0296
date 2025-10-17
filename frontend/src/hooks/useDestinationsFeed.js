@@ -1,6 +1,5 @@
-// src/hooks/useDestinationsFeed.js
 import React from "react";
-import { api } from "../api/client";
+import api from "../api/client";
 
 const TTL = 10 * 60 * 1000; // 10 min
 const LS_KEY = "dest_feed_cache_v1";

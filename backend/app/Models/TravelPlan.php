@@ -20,6 +20,7 @@ class TravelPlan extends Model
         'passenger_count',
         'transport_mode',
         'accommodation_class',
+        'total_cost',
     ];
 
     //Get the user that owns the travel plan.

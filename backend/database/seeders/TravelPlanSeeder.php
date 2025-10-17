@@ -122,17 +122,18 @@ class TravelPlanSeeder extends Seeder
 
             // Dodaj realan dnevni budžet (60–120$ po osobi)
             // Više dnevnog budžeta po osobi + dodatna rezerva za iskustva
-            $perDayPerPerson   = rand(100, 120); 
+            $perDayPerPerson   = rand(90, 110); 
             $variablePart      = $perDayPerPerson * $passengers * max(1, $days);
 
             // Rezerva nezavisna od obaveznih (npr. ulaznice, ture…)
-            $experienceReserve = rand(40, 90) * $passengers * max(1, $days);
+            $experienceReserve = rand(50, 100) * $passengers * max(1, $days);
 
             // preko svega  jos 20–30%
-            $marginFactor = [1.20, 1.25, 1.30][array_rand([1,2,3])];
+            $marginFactor = [1.20, 1.30, 1.35][array_rand([1,2,3])];
 
             // Konačni budžet: obavezno + dnevno + rezerva, pa margina
-            $budget = (int) ceil(($mandatory + $variablePart + $experienceReserve) * $marginFactor);
+            $budget = (int) ceil(max($mandatory * 1.6,  // bar 60% preko mandatory
+                                    ($mandatory + $variablePart + $experienceReserve) * $marginFactor));
 
             $minAllowed = max($mandatory, 100);  // barem mandatory, i barem 100
             if ($budget < $minAllowed) {

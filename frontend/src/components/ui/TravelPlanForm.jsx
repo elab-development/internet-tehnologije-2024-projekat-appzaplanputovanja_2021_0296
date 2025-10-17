@@ -1,4 +1,3 @@
-// src/components/travel-plan/TravelPlanForm.jsx
 import React from "react";
 import FormInput from "../ui/FormInput";
 import SelectInput from "../ui/SelectInput";
@@ -34,6 +33,7 @@ export default function TravelPlanForm({
   onSubmit,
   onCancel,
   disableSubmit = false,
+  onFormChange,
 }) {
   //   lokalni state forme
   const [form, setForm] = React.useState({
@@ -49,18 +49,28 @@ export default function TravelPlanForm({
     ...initialValues,
   });
 
+  const updateForm = React.useCallback(
+    (updater) => {
+      setForm((prev) => {
+        const next = typeof updater === "function" ? updater(prev) : updater;
+        // obavesti roditelja SAMO za korisničke promene
+        queueMicrotask(() => onFormChange?.(next));
+        return next;
+      });
+    },
+    [onFormChange]
+  );
+
   React.useEffect(() => {
     setForm((f) => {
       const next = { ...f };
-
       if (
         !lockedFields.includes("start_location") &&
         !next.start_location &&
         (lists.startLocations?.length ?? 0) > 0
       ) {
-        next.start_location = lists.startLocations[0]; // statičan niz koji šalješ iz CreateTravelPlan
+        next.start_location = lists.startLocations[0];
       }
-
       if (
         !lockedFields.includes("destination") &&
         !next.destination &&
@@ -69,22 +79,24 @@ export default function TravelPlanForm({
         const first = lists.destinations[0];
         next.destination = typeof first === "string" ? first : first.value;
       }
-
       return next;
     });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lists.startLocations, lists.destinations, lockedFields]);
 
   //   helperi za promenu polja
   const onChange = (e) => {
     const { name, value } = e.target;
-    setForm((f) => ({ ...f, [name]: value }));
+    updateForm((f) => ({ ...f, [name]: value }));
   };
+
   const onChangeNumber = (e) => {
     const { name, value } = e.target;
-    setForm((f) => ({ ...f, [name]: value === "" ? "" : Number(value) }));
+    updateForm((f) => ({ ...f, [name]: value === "" ? "" : Number(value) }));
   };
+
   const onChangePrefs = (vals) => {
-    setForm((f) => ({ ...f, preferences: vals }));
+    updateForm((f) => ({ ...f, preferences: vals }));
   };
 
   //   read-only render helper
@@ -181,7 +193,7 @@ export default function TravelPlanForm({
               label="Start location"
               value={form.start_location}
               onChange={(e) =>
-                setForm((f) => ({ ...f, start_location: e.target.value }))
+                updateForm((f) => ({ ...f, start_location: e.target.value }))
               }
               options={(lists.startLocations || []).map((v) => ({
                 value: v,
@@ -201,7 +213,7 @@ export default function TravelPlanForm({
               label="Destination"
               value={form.destination}
               onChange={(e) =>
-                setForm((f) => ({ ...f, destination: e.target.value }))
+                updateForm((f) => ({ ...f, destination: e.target.value }))
               }
               options={toOptions(lists.destinations)}
               placeholder="Select destination"
@@ -276,7 +288,7 @@ export default function TravelPlanForm({
               label="Transport mode"
               value={form.transport_mode}
               onChange={(e) =>
-                setForm((f) => ({ ...f, transport_mode: e.target.value }))
+                updateForm((f) => ({ ...f, transport_mode: e.target.value }))
               }
               options={toOptions(lists.transportModes)}
               placeholder="Select transport"
@@ -293,7 +305,7 @@ export default function TravelPlanForm({
               label="Accommodation class"
               value={form.accommodation_class}
               onChange={(e) =>
-                setForm((f) => ({
+                updateForm((f) => ({
                   ...f,
                   accommodation_class: e.target.value,
                 }))

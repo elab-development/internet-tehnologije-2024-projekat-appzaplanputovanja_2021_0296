@@ -8,6 +8,8 @@ use App\Models\Setting;
 use App\Models\TravelPlan;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
+use App\Exceptions\BusinessRuleException;
+use App\Exceptions\ConflictException;
 
 class TravelPlanStoreService
 {
@@ -49,7 +51,10 @@ class TravelPlanStoreService
             ->first();
 
         if ($transportCount !== 2 || !$accommodationItem) {
-            abort(422, 'Mandatory items missing. Increase budget or adjust dates.');
+            throw new BusinessRuleException( 
+                'Mandatory items missing. Increase budget or adjust dates.', 
+                'MANDATORY_MISSING'
+            );
         }
 
         // smeštaj mora da pokriva ceo boravak (po Settings)
@@ -61,7 +66,10 @@ class TravelPlanStoreService
 
         if (!Carbon::parse($accommodationItem->time_from)->equalTo($shouldFrom) ||
             !Carbon::parse($accommodationItem->time_to)->equalTo($shouldTo)) {
-            abort(422, 'Accommodation must span the entire stay according to check-in/out settings.');
+           throw new BusinessRuleException(
+                'Accommodation must span the entire stay according to check-in/out settings.',
+                'ACCOMMODATION_NOT_SPANNING_STAY'
+            );
         }
     }
     /**
@@ -101,17 +109,29 @@ class TravelPlanStoreService
             ->first();
 
         if (!$outboundTransport || !$returnTransport || !$accommodation) {
-            abort(422, 'There are no activities for the selected transportation routes or accommodation at the selected location.');
+            throw new BusinessRuleException( 
+                'There are no activities for the selected transportation routes or accommodation at the selected location.', 
+                 'MANDATORY_VARIANTS_MISSING'
+            );
         }
 
         // 3) Provera budžeta za obavezne
+        $startDate = Carbon::parse($plan->start_date)->startOfDay();
+        $endDate   = Carbon::parse($plan->end_date)->startOfDay();
+        $nights    = max(1, $startDate->diffInDays($endDate));
+     
+
         $mandatoryTotal =
-            ($outboundTransport->price + $returnTransport->price + $accommodation->price)
-            * $plan->passenger_count;
+            ($outboundTransport->price + $returnTransport->price) * $plan->passenger_count
+        + ($accommodation->price * $nights * $plan->passenger_count);
 
         if ($mandatoryTotal > (float)$plan->budget) {
-            abort(422, 'The budget does not cover mandatory transportation (both ways) and accommodation.');
+            throw new BusinessRuleException( 
+                'The budget does not cover mandatory transportation (both ways) and accommodation.',
+                 'BUDGET_TOO_LOW_FOR_MANDATORY'
+            ); 
         }
+
 
         // 4) Kreiranje 3 obavezne stavke, tačnim redosledom
 
@@ -364,10 +384,11 @@ class TravelPlanStoreService
             if ($overlap) return null;
         }
 
-        $amount = $activity->price * $plan->passenger_count;
+        $amount = $this->computeAmount($plan, $activity, $timeFrom, $timeTo);
         if ($plan->total_cost + $amount > $plan->budget) {
             return null;
         }
+
 
         $item = PlanItem::create([
             'travel_plan_id' => $plan->id,
@@ -392,7 +413,8 @@ class TravelPlanStoreService
     ): PlanItem {
         // guard: kraj mora biti pre ili na dan end_date (za povratni transport)
         if ($timeTo->gt(Carbon::parse($plan->end_date)->endOfDay())) {
-            abort(422, 'Mandatory item exceeds the plan end date window.');
+            throw new BusinessRuleException(
+                'Mandatory item exceeds the plan end date window.', 'MANDATORY_OUTSIDE_WINDOW');
         }
 
         // overlap provera (Accommodation se ignoriše)
@@ -403,13 +425,15 @@ class TravelPlanStoreService
                 ->where('time_to','>',$timeFrom)
                 ->exists();
             if ($overlap) {
-                abort(422, 'Mandatory item overlaps with existing schedule.');
+                throw new BusinessRuleException(
+                    'Mandatory item overlaps with existing schedule.', 'MANDATORY_OVERLAP');
             }
         }
 
-        $amount = $activity->price * $plan->passenger_count;
+        $amount = $this->computeAmount($plan, $activity, $timeFrom, $timeTo);
         if ($plan->total_cost + $amount > $plan->budget) {
-            abort(422, 'Budget too low to include mandatory item.');
+            throw new BusinessRuleException(
+                'Budget too low to include mandatory item.', 'BUDGET_TOO_LOW_FOR_MANDATORY');
         }
 
         $item = PlanItem::create([
@@ -424,7 +448,7 @@ class TravelPlanStoreService
         $plan->increment('total_cost', $amount);
         $plan->refresh();
 
-        return $item;
+        return $item;  
     }
 
     private function syncTotalCost(TravelPlan $plan): void //za slucaj neusklađenosti na kraju kreiranja plana
@@ -434,4 +458,17 @@ class TravelPlanStoreService
             $plan->update(['total_cost' => $sum]);
         }
     }
+
+    private function computeAmount(TravelPlan $plan, Activity $activity, Carbon $from, Carbon $to): float
+    {
+        $pax = max(1, (int)$plan->passenger_count);
+        if (strtolower($activity->type) === 'accommodation') {
+            $startDate = Carbon::parse($plan->start_date)->startOfDay();
+            $endDate   = Carbon::parse($plan->end_date)->startOfDay();
+            $nights = max(1, $startDate->diffInDays($endDate));
+            return (float)$activity->price * $nights * $pax;
+        }
+        return (float)$activity->price * $pax;
+    }
+
 }

@@ -1,6 +1,5 @@
-// src/hooks/useActivityOptions.js
 import React from "react";
-import { api } from "../api/client";
+import api from "../api/client";
 
 const LS_KEY = "activity_options_v1";
 const TTL_MS = 24 * 60 * 60 * 1000; // 24h

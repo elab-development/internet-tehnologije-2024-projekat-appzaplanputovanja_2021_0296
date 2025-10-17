@@ -1,4 +1,3 @@
-// src/components/ui/FormInput.jsx
 import React from "react";
 
 let __autoId = 0;
