@@ -5,12 +5,16 @@ import App from "./App";
 import "bootstrap/dist/css/bootstrap.min.css";
 import "./index.css";
 import { AuthProvider } from "./context/AuthContext";
+import { CurrencyProvider } from "./context/CurrencyContext";
+import "leaflet/dist/leaflet.css";
 
 const root = ReactDOM.createRoot(document.getElementById("root"));
 root.render(
-  <BrowserRouter>
-    <AuthProvider>
-      <App />
-    </AuthProvider>
-  </BrowserRouter>
+  <AuthProvider>
+    <BrowserRouter>
+      <CurrencyProvider defaultCurrency="EUR" baseCurrency="EUR">
+        <App />
+      </CurrencyProvider>
+    </BrowserRouter>
+  </AuthProvider>
 );

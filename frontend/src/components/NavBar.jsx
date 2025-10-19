@@ -8,8 +8,13 @@ import {
 } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { getToken } from "../api/client";
+import CurrencySwitcher from "../components/CurrencySwitcher";
 
-export default function NavBar({ variant = "auto", onDestinationsClick }) {
+export default function NavBar({
+  variant = "auto",
+  onDestinationsClick,
+  onBrandClick,
+}) {
   const { isAuth, logout } = useAuth();
   const nav = useNavigate();
   const { pathname } = useLocation();
@@ -76,7 +81,17 @@ export default function NavBar({ variant = "auto", onDestinationsClick }) {
     <nav className="app-navbar navbar navbar-expand-lg navbar-light bg-light shadow-sm sticky-top">
       <div className="container">
         {/*  Brand: home za guest/home, dashboard reset za dashboard */}
-        <Link className="navbar-brand d-flex align-items-center gap-2" to="/">
+        <Link
+          className="navbar-brand d-flex align-items-center gap-2"
+          to="/"
+          onClick={(e) => {
+            if (pathname === "/") {
+              // već smo na Home → NEMA navigacije, samo reset
+              e.preventDefault();
+              onBrandClick?.();
+            }
+          }}
+        >
           <img src="/travel-icon.png" alt="Travel Planner" height="22" />
           <span className="fw-bold">Travel Planner</span>
         </Link>
@@ -101,7 +116,7 @@ export default function NavBar({ variant = "auto", onDestinationsClick }) {
                     onDestinationsClick?.();
                   }}
                 >
-                  Destinations
+                  Destination
                 </a>
               </li>
             )}
@@ -109,12 +124,26 @@ export default function NavBar({ variant = "auto", onDestinationsClick }) {
 
           {/* Desna strana */}
           {mode === "guest" && (
-            <Link to="/login" className="btn btn-outline-primary">
-              Login / Sign up
-            </Link>
+            <div className="d-flex align-items-center gap-2">
+              <CurrencySwitcher size="sm" />
+              <Link to="/login" className="btn btn-outline-primary">
+                Login / Sign up
+              </Link>
+            </div>
           )}
 
-          {(mode === "home" || mode === "dashboard-simple") && (
+          {mode === "home" && (
+            <div className="d-flex align-items-center gap-2">
+              <CurrencySwitcher size="sm" />
+              <Link to="/dashboard" className="btn btn-outline-secondary">
+                My account
+              </Link>
+              <button className="btn btn-primary" onClick={handleLogout}>
+                Logout
+              </button>
+            </div>
+          )}
+          {mode === "dashboard-simple" && (
             <div className="d-flex align-items-center gap-2">
               <Link to="/dashboard" className="btn btn-outline-secondary">
                 My account

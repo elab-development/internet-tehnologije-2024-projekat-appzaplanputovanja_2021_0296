@@ -4,6 +4,10 @@ import api from "../api/client";
 import NavBar from "../components/NavBar";
 import PrimaryButton from "../components/ui/PrimaryButton";
 import { confirmDialog, showError, showSuccess } from "../api/notify";
+import Price from "../components/Price";
+import useWeather from "../hooks/useWeather";
+import WeatherBadge from "../components/WeatherBadge";
+import CostByDayChart from "../components/CostByDayChart";
 
 export default function ShowTravelPlan() {
   const { id } = useParams();
@@ -35,6 +39,17 @@ export default function ShowTravelPlan() {
     })();
   }, [id]);
 
+  // ===== Weather data for destination =====
+  const {
+    loading: wxLoading,
+    error: wxError,
+    data: wx,
+  } = useWeather({
+    destination: plan?.destination,
+    startDate: plan?.start_date,
+    endDate: plan?.end_date,
+    ttlHours: 12, // keš 12h; promeni po želji
+  });
   // ===== Navigation helpers =====
   const handleBack = () => navigate("/dashboard");
   const handleEdit = () => navigate(`/dashboard/plans/${id}/edit`);
@@ -120,8 +135,9 @@ export default function ShowTravelPlan() {
             <p className="text-muted mb-0">
               {plan.start_location} → {plan.destination} <br />
               {plan.start_date} — {plan.end_date} <br />
-              <strong>Budget:</strong> ${plan.budget} ·{" "}
-              <strong>Total cost:</strong> ${plan.total_cost} <br />
+              <strong>Budget:</strong> <Price amount={plan.budget} /> ·{" "}
+              <strong>Total cost:</strong> <Price amount={plan.total_cost} />{" "}
+              <br />
               <strong>Passengers:</strong> {plan.passenger_count}
             </p>
           </div>
@@ -175,7 +191,7 @@ export default function ShowTravelPlan() {
                         {item.time_from} — {item.time_to}
                       </p>
                       <p className="small text-muted mb-1">
-                        ${item.amount.toFixed(2)}
+                        <Price amount={item.amount} />
                       </p>
                       {activity.content && (
                         <p className="small text-muted mt-auto">
@@ -189,6 +205,61 @@ export default function ShowTravelPlan() {
             })}
           </div>
         )}
+
+        <div className="mb-1 mt-4">
+          <h5 className="mb-3">Trip Insights</h5>
+          <WeatherBadge
+            loading={wxLoading}
+            error={wxError}
+            summary={wx?.summary}
+          />
+        </div>
+
+        {/* tabela vreme i grafik troskovi */}
+        <div className="row g-3 weather-chart-row">
+          {/* Levo vreme */}
+          <div className="col-12 col-lg-5 weather-column">
+            {Array.isArray(wx?.days) && wx.days.length > 0 && (
+              <div className="weather-card mt-2">
+                <table className="weather-table mb-0">
+                  <thead>
+                    <tr>
+                      <th style={{ width: 110 }}>Date</th>
+                      <th>Max</th>
+                      <th>Min</th>
+                      <th>Wind</th>
+                      <th>Rain</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {wx.days.slice(0, 7).map((d) => (
+                      <tr key={d.date}>
+                        <td className="text-muted">{d.date}</td>
+                        <td>
+                          <strong>
+                            {d.tmax != null ? Math.round(d.tmax) : "–"}°C
+                          </strong>
+                        </td>
+                        <td>{d.tmin != null ? Math.round(d.tmin) : "–"}°C</td>
+                        <td>
+                          {d.wind != null ? Math.round(d.wind) : "–"} km/h
+                        </td>
+                        <td>{d.rain != null ? Math.round(d.rain) : "–"} mm</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+
+          {/* Desno grafikon */}
+          <div className="col-12 col-lg-4 chart-column">
+            <div className="cost-chart-wrapper">
+              <CostByDayChart items={items} height={260} />
+            </div>
+          </div>
+        </div>
       </div>
     </>
   );
