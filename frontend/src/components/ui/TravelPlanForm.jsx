@@ -270,7 +270,7 @@ export default function TravelPlanForm({
             name="budget"
             type="number"
             step="0.01"
-            label="Available budget (USD)"
+            label="Available budget"
             placeholder="e.g., 1200.00"
             value={form.budget}
             onChange={onChangeNumber}

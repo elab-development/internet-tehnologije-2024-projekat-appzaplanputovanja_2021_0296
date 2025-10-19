@@ -62,26 +62,6 @@
   }
 }
 
-/* (Opcionalno) Dark mode – lako uključivo */
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg-soft: #0f1115;
-    --border: #1d2230;
-  }
-  body {
-    background: var(--bg-soft);
-  }
-  .card,
-  .tp-card,
-  .plan-item-card {
-    border-color: var(--border);
-  }
-  .app-footer {
-    border-top-color: var(--border);
-    color: #9aa3b2;
-  }
-}
-
 /* === Base / reset tweaks === */
 body {
   font-family: "Poppins", sans-serif;
@@ -236,4 +216,110 @@ body {
 
 .edit-plan-container .form-label {
   font-weight: 500;
+}
+/* =======================
+   Breadcrumbs footer
+========================= */
+.breadcrumb a {
+  transition: all 0.2s ease;
+}
+.breadcrumb a:hover {
+  color: #0d6efd;
+  text-decoration: underline;
+}
+.breadcrumb-item + .breadcrumb-item::before {
+  content: "›";
+  color: #6c757d;
+  margin: 0 4px;
+}
+.breadcrumb {
+  background: transparent;
+  padding: 0;
+  margin-bottom: 1rem;
+}
+.app-footer {
+  background-color: #f8f9fa;
+  color: #6c757d;
+}
+.app-footer nav {
+  margin-bottom: 0.25rem;
+}
+.app-footer .breadcrumb {
+  justify-content: left;
+  background: transparent;
+  margin-bottom: 0;
+}
+
+/* =======================
+   Destinations Feed
+========================= */
+.card .btn-outline-secondary {
+  --bs-btn-padding-y: 0.3rem;
+  --bs-btn-padding-x: 0.6rem;
+}
+
+/* === Compact weather + chart cards === */
+
+/* zajednički stil kartica */
+.weather-card,
+.cost-chart-wrapper {
+  border: 1px solid #dee2e6;
+  border-radius: 0.5rem;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.06);
+  background-color: #fff;
+  padding: 0.75rem;
+}
+
+/* tabela kompaktnija */
+.weather-table {
+  width: 100%;
+  border: 1px solid #dee2e6;
+  border-collapse: collapse;
+  font-size: 0.8rem;
+}
+
+.weather-table th,
+.weather-table td {
+  border: 1px solid #dee2e6;
+  padding: 0.3rem 0.4rem;
+  text-align: left;
+}
+
+.weather-table th {
+  background-color: #f8f9fa;
+  font-weight: 600;
+}
+
+/* chart boja */
+.recharts-bar-rectangle path {
+  fill: #6c757d !important;
+}
+
+/* layout i fiksne dimenzije */
+.weather-chart-row {
+  margin-top: 1rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+@media (min-width: 992px) {
+  .weather-column,
+  .chart-column {
+    flex: 0 0 48%;
+    max-width: 48%;
+  }
+
+  .weather-card,
+  .cost-chart-wrapper {
+    height: 280px; /* ista visina kartica */
+    overflow-y: auto;
+  }
+}
+
+/* mali razmak ispod sekcije */
+.weather-chart-row + .my-4 {
+  margin-top: 1.5rem;
 }

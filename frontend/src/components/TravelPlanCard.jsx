@@ -1,5 +1,6 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
+import Price from "./Price";
 
 export default function TravelPlanCard({ plan }) {
   const navigate = useNavigate();
@@ -19,7 +20,8 @@ export default function TravelPlanCard({ plan }) {
           <strong>To:</strong> {plan.end_date}
         </p>
         <p className="mb-0 text-muted">
-          <strong>Total cost:</strong> ${Number(plan.total_cost).toFixed(2)}
+          <strong>Total cost:</strong>{" "}
+          <Price amount={Number(plan.total_cost)} />
         </p>
       </div>
     </div>
